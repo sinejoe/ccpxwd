@@ -176,7 +176,7 @@
        reflows the whole clue column's line-wrapping as you navigate. */
   }
   .clue:hover{ background:#efe6d2; }
-  .clue.active{ background:var(--hi2); border-left-color:var(--accent); color:var(--accent); }
+  .clue.active{ background:var(--hi2); border-left-color:#594923; color:#594923; }
   .clue.crossing{ background:var(--hi); }
   .clue b{ margin-right:4px; }
   @media(max-width:860px){
@@ -991,6 +991,7 @@ document.addEventListener('keydown', (e)=>{
 });
 
 document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(!confirm('Clear the whole grid? This can\'t be undone.')) return;
   for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) if(!grid[r][c].black) grid[r][c].letter='';
   render();
   queueSave();

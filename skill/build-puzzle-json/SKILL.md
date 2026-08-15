@@ -55,9 +55,8 @@ instead.
 
 ## Step 4 — Write puzzles/<date>.json
 
-Schema (see `HANDOFF.md` "How the puzzle data is structured" in the repo
-root for the authoritative reference, since `index.html`'s
-`loadPuzzleData()` consumes it directly):
+Schema (authoritative — `index.html`'s `loadPuzzleData()` consumes this
+shape directly):
 
 ```json
 {

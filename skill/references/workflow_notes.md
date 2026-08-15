@@ -40,38 +40,16 @@ standard weekly issue instead, usually named with just the date.)
    is visually obvious at a glance. Page number drifts week to week
    with ad placement (page 30 one week, page 23 the next), so don't
    assume last week's number. Note the page number once you spot it.
-5. **Pull the page image and run grid extraction — inside the browser,
-   not the sandbox.** `image.isu.pub` isn't on the sandbox's network
-   allowlist, so `bash`/`web_fetch` can't download
+5. **Pull the page image inside the browser, not the sandbox.**
+   `image.isu.pub` isn't on the sandbox's network allowlist, so
+   `bash`/`web_fetch` can't download
    `image.isu.pub/<doc-id>/jpg/page_<n>.jpg` directly. The browser tab
-   *can* reach it though (no CORS/allowlist issue there), so run the
-   extraction algorithm itself as injected JavaScript via
-   `claude-in-chrome:javascript_tool`, operating on a `<canvas>`
-   `getImageData()` of the fetched image, rather than trying to get the
-   raw file into the sandbox. Port of `scripts/extract_grid.py`'s
-   approach for in-browser use:
-   - Load the full-page JPEG into an `Image()` (`crossOrigin =
-     'anonymous'`), draw to a canvas, `getImageData`.
-   - The crossword grid is usually a small part of a busy full
-     newspaper page (classifieds, other content sharing the page), so
-     a full-page-width scan for grid lines will typically find
-     nothing — first locate a rough bounding box (e.g. scan a
-     downscaled preview for a dense band of short alternating
-     dark/light runs, which is what a grid looks like at low res),
-     then run the real boundary detection restricted to that crop.
-   - Same three-stage boundary detection as the script: full-width row
-     scan → column scan bounded by those rows → re-scan rows bounded
-     by those columns. Also add an end-trimming pass that drops any
-     boundary whose gap to its neighbor is much smaller than the
-     median spacing (a near-duplicate detection of the same physical
-     line) — this came up on a page where the crop's left/top edge
-     produced one spurious extra boundary right next to the real one.
-   - Classify each cell by mean grayscale brightness inside its
-     interior (same threshold approach as the script, ~140 works well
-     against JPEG compression noise — the script's default of 150 is
-     also reasonable, tune per-image if the split isn't clean).
-   - Run the same auto-numbering sanity check as always before trusting
-     the result.
+   *can* reach it though (no CORS/allowlist issue there) — fetch it via
+   `claude-in-chrome:javascript_tool` and save it to disk as described
+   in `fetch-issue/SKILL.md` Step 2. Grid extraction itself happens
+   later, against the saved file, in `build-puzzle-json/SKILL.md`
+   Step 1 (`scripts/extract_grid.py`) — don't try to run extraction
+   in-browser, there's no need to.
 6. **Get clue text from the page's real SVG text layer, not a
    screenshot read.** Issuu renders each visible page/spread as an SVG
    with individually-positioned `<text>` elements (one per glyph or
@@ -90,7 +68,8 @@ standard weekly issue instead, usually named with just the date.)
    would have looked exactly as suspicious either way and needed
    checking against the actual glyph positions rather than assumed to
    be a misread.
-7. Fill in `assets/crossword_template.html` per the main SKILL.md.
+7. Hand off to `build-puzzle-json/SKILL.md` to turn the saved raw
+   material into `puzzles/<date>.json`.
 
 
 

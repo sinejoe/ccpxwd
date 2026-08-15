@@ -1,13 +1,15 @@
 # Project instructions for Claude Code
 
-Read `HANDOFF.md` in full before touching code in this repo. It has
-the file manifest, the puzzle data format, and — most importantly — a
-list of specific UI bugs that were already found and fixed, with why
-each fix works the way it does (arrow-key nav, click-vs-focus
-orientation handling, typing-replaces-not-inserts, backspace order,
-instant vs. smooth scroll, focus-mode sizing). Don't re-simplify
-anything HANDOFF.md flags as deliberate — those aren't leftover
-complexity, they're regression fixes.
+See `README.md` for the file manifest and puzzle data format.
+
+`HANDOFF.md` (removed from the repo, still recoverable via
+`git log --diff-filter=D -- HANDOFF.md` / `git show <sha>:HANDOFF.md`)
+documented several UI behaviors in `index.html` that look like
+simplification targets but are deliberate regression fixes: arrow-key
+nav, click-vs-focus orientation handling, typing-replaces-not-inserts,
+backspace order, instant vs. smooth scroll, and focus-mode sizing.
+Before "cleaning up" any of that logic, check the git history for the
+reasoning rather than assuming it's leftover complexity.
 
 ## Testing
 

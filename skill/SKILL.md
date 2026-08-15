@@ -33,8 +33,9 @@ to `build-puzzle-json`.
 
 `index.html` itself is a static shell that fetches whatever
 `puzzles/index.json` points to — a routine new week never requires
-editing `index.html`. See the repo's `HANDOFF.md` ("How the puzzle data
-is structured") for the full schema and rationale.
+editing `index.html`. Puzzle JSON schema lives inline in
+`build-puzzle-json/SKILL.md` Step 4 — that's the authoritative
+reference.
 
 ## Optional: baking in a reference solve
 
@@ -42,8 +43,7 @@ This is a separate, later, on-site step — not part of either sub-skill
 above. Once a puzzle is published, load the live page with `?admin=1`,
 enter the passphrase, solve the puzzle in the normal grid, and use the
 "Generate solution-hashes file from my grid" button to produce that
-puzzle's `solutionHashesFile` contents. See `HANDOFF.md`'s "Reference
-solve" section for the full threat model and the framing rules that
-apply to any match/mismatch UI (never call anything "wrong", never flag
-individual cells, always make clear it's *a* submitted solve, not an
-official answer key).
+puzzle's `solutionHashesFile` contents. Framing rules for any
+match/mismatch UI are in the repo's `CLAUDE.md`: never call anything
+"wrong", never flag individual cells, always make clear it's *a*
+submitted solve, not an official answer key.

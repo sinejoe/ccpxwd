@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rated PG-13 — Charleston City Paper Crossword</title>
+<style>
+  :root{
+    --paper:#f6f1e6;
+    --ink:#1c1a17;
+    --rule:#c9beac;
+    --accent:#a3312a;
+    --cell:#fffdf8;
+    --black:#1c1a17;
+    --hi:#f3d9a4;
+    --hi2:#e8c266;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:Georgia, 'Times New Roman', serif;
+    padding:14px;
+  }
+  header{
+    text-align:center;
+    border-bottom:3px double var(--ink);
+    padding-bottom:10px;
+    margin-bottom:14px;
+  }
+  header .kicker{
+    font-family:'Courier New', monospace;
+    letter-spacing:3px;
+    font-size:11px;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+  header h1{
+    margin:4px 0 2px;
+    font-size:26px;
+    letter-spacing:1px;
+  }
+  header .sub{
+    font-size:12.5px;
+    font-style:italic;
+    color:#5a5346;
+  }
+  #banner{
+    display:none;
+    background:var(--accent);
+    color:var(--paper);
+    text-align:center;
+    padding:8px;
+    font-size:14px;
+    letter-spacing:1px;
+    margin-bottom:10px;
+    border-radius:2px;
+  }
+  .toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content:center;
+    margin-bottom:12px;
+  }
+  button{
+    font-family:'Courier New', monospace;
+    font-size:11.5px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--cell);
+    border:1px solid var(--ink);
+    color:var(--ink);
+    padding:7px 12px;
+    cursor:pointer;
+    border-radius:2px;
+  }
+  button:active{ transform:translateY(1px); }
+  button.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  #hamburgerBtn{
+    display:none;
+  }
+
+  /* ---- Normal mode: comfortable centered layout ---- */
+  #app{
+    display:flex;
+    gap:22px;
+    align-items:flex-start;
+    justify-content:center;
+    flex-wrap:wrap;
+    max-width:1000px;
+    margin:0 auto;
+  }
+  #leftCol{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    flex:0 0 auto;
+  }
+  #gridWrap{
+    display:flex;
+    justify-content:center;
+  }
+  #grid{
+    display:grid;
+    grid-template-columns:repeat(15, minmax(20px,28px));
+    grid-template-rows:repeat(15, minmax(20px,28px));
+    border:2px solid var(--ink);
+  }
+  .cell{
+    position:relative;
+    background:var(--cell);
+    border:0.5px solid var(--rule);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .cell.black{ background:var(--black); cursor:pointer; }
+  .cell.white input{
+    width:100%;
+    height:100%;
+    border:none;
+    background:transparent;
+    text-align:center;
+    text-transform:uppercase;
+    font-family:Georgia, serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--ink);
+    caret-color:transparent;
+  }
+  .cell.white input:focus{ outline:none; }
+  .cell.white.editable{ cursor:pointer; }
+  .cell .num{
+    position:absolute;
+    top:0px; left:1px;
+    font-size:7px;
+    font-family:'Courier New',monospace;
+    color:#5a5346;
+    pointer-events:none;
+  }
+  .cell.hi{ background:var(--hi); }
+  .cell.hi2{ background:var(--hi2); }
+  #cluesPanel{
+    display:flex;
+    gap:16px;
+    flex:1 1 340px;
+    min-width:280px;
+    max-width:460px;
+    height:600px;
+    padding:10px 12px;
+    border:1px solid var(--rule);
+    background:var(--cell);
+    position:relative;
+  }
+  .cluecol{
+    flex:1;
+    min-width:0;
+    height:100%;
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  .cluecol h2{
+    font-size:13px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:4px;
+    margin:0 0 6px;
+    position:sticky;
+    top:0;
+    background:var(--cell);
+  }
+  .clue{
+    font-size:12px;
+    line-height:1.45;
+    padding:2px 4px 2px 7px;
+    cursor:pointer;
+    border-radius:2px;
+    border-left:3px solid transparent;
+    /* Active/crossing state is conveyed with background + border-left + color
+       only -- deliberately NOT font-weight, which changes glyph widths and
+       reflows the whole clue column's line-wrapping as you navigate. */
+  }
+  .clue:hover{ background:#efe6d2; }
+  .clue.active{ background:var(--hi2); border-left-color:var(--accent); color:var(--accent); }
+  .clue.crossing{ background:var(--hi); }
+  .clue b{ margin-right:4px; }
+  @media(max-width:860px){
+    #app{ flex-direction:column; align-items:center; }
+    #cluesPanel{ max-width:640px; height:auto; }
+    .cluecol{ height:auto; overflow-y:visible; }
+  }
+
+  /* ---- Focus mode: fills the viewport. Grid sized off available HEIGHT
+     (the constrained dimension for a square grid next to a text panel),
+     clue panel fills whatever width is left. Header/toolbar tucked behind
+     the hamburger so nothing but grid+clues takes up room. ---- */
+  body.focus-mode{
+    overflow:hidden;
+    padding:0;
+    height:100vh;
+    height:100dvh;
+  }
+  body.focus-mode header,
+  body.focus-mode .toolbar,
+  body.focus-mode footer{ display:none; }
+  body.focus-mode #hamburgerBtn{
+    display:block;
+    position:absolute;
+    top:-1px; right:-1px;
+    z-index:10;
+    /* Must stay above the dropdown panel once it's open, or the panel covers
+       the button and there's no way to click it again to close. */
+    font-size:20px;
+    line-height:20px;
+    padding:5px 7px;
+    border:1.5px solid var(--rule);
+    background:var(--cell);
+    border-radius:0;
+  }
+  body.focus-mode #app{
+    max-width:none;
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    margin:0;
+    padding:12px 14px;
+    box-sizing:border-box;
+    align-items:stretch;
+    flex-wrap:nowrap;
+    gap:16px;
+  }
+  body.focus-mode #leftCol{ height:100%; }
+  body.focus-mode #gridWrap{ height:100%; }
+  body.focus-mode #grid{
+    height:100%;
+    width:auto;
+    aspect-ratio:1/1;
+    grid-template-columns:repeat(15, 1fr);
+    grid-template-rows:repeat(15, 1fr);
+  }
+  body.focus-mode .cell.white input{ font-size:clamp(11px, 3.2vmin, 30px); }
+  body.focus-mode .cell .num{ font-size:clamp(6px, 1vmin, 11px); }
+  body.focus-mode #cluesPanel{
+    flex:1 1 auto;
+    max-width:none;
+    height:100%;
+  }
+  /* Clue text can afford to be noticeably bigger once the panel isn't
+     capped at a small fixed width. */
+  body.focus-mode .clue{ font-size:14.5px; line-height:1.5; }
+  body.focus-mode .cluecol h2{ font-size:14px; }
+  /* Toolbar doubles as the hamburger's dropdown panel in focus mode.
+     Focus/Exit are mutually exclusive depending on which mode is active.
+     top/right are set via JS to align exactly with #cluesPanel's own corner
+     (see positionToolbarDropdown) rather than guessed here. */
+  #focusBtn{ display:inline-block; }
+  body.focus-mode #focusBtn{ display:none; }
+  #exitFocusBtn{ display:none; }
+  body.focus-mode #exitFocusBtn{ display:inline-block; }
+  body.focus-mode #toolbar{
+    display:none;
+    position:fixed;
+    z-index:9;
+    flex-direction:column;
+    align-items:stretch;
+    background:var(--cell);
+    border:2px solid var(--ink);
+    padding:12px;
+    gap:8px;
+    min-width:230px;
+  }
+  body.focus-mode #toolbar button{
+    padding:9px 14px;
+    font-size:12.5px;
+  }
+  body.focus-mode #toolbar.open{ display:flex; }
+  @media(max-width:700px){
+    body.focus-mode #app{ flex-direction:column; }
+    body.focus-mode #leftCol{ height:auto; flex:0 0 auto; }
+    body.focus-mode #grid{ height:auto; width:min(94vw,94vh); }
+    body.focus-mode #cluesPanel{ flex:1 1 auto; min-height:0; }
+  }
+
+  footer{
+    text-align:center;
+    font-size:11px;
+    color:#8a8272;
+    margin-top:20px;
+    font-family:'Courier New',monospace;
+  }
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(28,26,23,0.55);
+    z-index:2000;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{
+    background:var(--paper);
+    border:2px solid var(--ink);
+    padding:18px 20px;
+    max-width:480px;
+    width:100%;
+    box-sizing:border-box;
+    font-family:Georgia, serif;
+  }
+  .modal-box h3{ margin:0 0 8px; font-size:16px; }
+  .modal-box p{ margin:0 0 10px; font-size:12.5px; line-height:1.5; color:#5a5346; }
+  .modal-box textarea{
+    width:100%;
+    height:110px;
+    font-family:'Courier New',monospace;
+    font-size:11.5px;
+    padding:8px;
+    box-sizing:border-box;
+    border:1px solid var(--rule);
+    resize:vertical;
+    background:var(--cell);
+    color:var(--ink);
+  }
+  .modal-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+    margin-top:12px;
+  }
+  /* Persistent status, not a one-off popup -- just reflects current grid
+     fill state. Will also carry a match/mismatch count once there's an
+     actual solution to compare against; for now it can only say "filled". */
+  .status-badge{
+    display:none;
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    letter-spacing:0.5px;
+    padding:7px 12px;
+    border:1px solid var(--rule);
+    background:var(--hi);
+    color:var(--ink);
+    align-self:center;
+  }
+  .status-badge.show{ display:inline-block; }
+  /* Understated either way -- a mismatch isn't an error state, just a note */
+  .status-badge.match{ background:#dce8dc; }
+  .status-badge.mismatch{ background:#efe2c8; }
+  #hamburgerBtn.complete::after{
+    content:'';
+    position:absolute;
+    top:2px; right:2px;
+    width:7px; height:7px;
+    border-radius:50%;
+    background:#3f7d4a;
+    border:1px solid var(--paper);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">Charleston City Paper · 08.14.2026</div>
+  <h1>&ldquo;And My Ax!&rdquo;</h1>
+  <div class="sub">Jonesin' by Matt Jones &mdash; swapping one for the other.</div>
+</header>
+
+<div id="banner"></div>
+
+<div class="toolbar" id="toolbar">
+  <span id="completionStatus" class="status-badge"></span>
+  <button id="focusBtn">Focus mode</button>
+  <button id="editBtn">Fix grid squares</button>
+  <button id="checkBtn">Check letters</button>
+  <button id="revealBtn">Reveal letter</button>
+  <button id="clearBtn">Clear all</button>
+  <button id="exportBtn">Copy progress code</button>
+  <button id="importBtn">Restore from code</button>
+</div>
+
+<div id="app">
+  <div id="leftCol">
+    <div id="gridWrap"><div id="grid"></div></div>
+  </div>
+  <div id="cluesPanel">
+    <button id="hamburgerBtn" aria-label="Tools">&#9776;</button>
+    <div class="cluecol">
+      <h2>Across</h2>
+      <div id="acrossList"></div>
+    </div>
+    <div class="cluecol">
+      <h2>Down</h2>
+      <div id="downList"></div>
+    </div>
+  </div>
+</div>
+
+<footer>Tap &ldquo;Fix grid squares&rdquo; to toggle any black/white square that doesn't match your paper — clue numbers update automatically.</footer>
+
+<div id="exportModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Copy your progress code</h3>
+    <p>The text below is already selected — copy it (Ctrl/Cmd+C) and save it somewhere. Paste it back in with &ldquo;Restore from code&rdquo; any time after an update.</p>
+    <textarea id="exportText" readonly></textarea>
+    <div class="modal-actions">
+      <button id="copyToClipboardBtn">Copy to clipboard</button>
+      <button id="closeExportBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="importModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Restore from code</h3>
+    <p>Paste your progress code below.</p>
+    <textarea id="importText" placeholder="Paste your code here"></textarea>
+    <div class="modal-actions">
+      <button id="doImportBtn">Restore</button>
+      <button id="closeImportBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const SIZE = 15;
+
+// Black-square layout, extracted directly from the full-resolution page image via pixel
+// analysis (browser-side, since Issuu serves per-page images/SVG rather than a real PDF --
+// see references/workflow_notes.md). Verified: auto-numbering this produces exactly
+// 36 Across / 42 Down entries matching the clue numbers below, 1 through 72 with no gaps.
+let pattern = [
+"...#...#...#...",
+"...#...#...#...",
+".......#.......",
+"...............",
+"###......#.....",
+"...###....##...",
+"............###",
+"......###......",
+"###............",
+"...##....###...",
+".....#......###",
+"...............",
+".......#.......",
+"...#...#...#...",
+"...#...#...#..."
+];
+
+// Optional reference solve for match/mismatch comparison -- NOT an official
+// answer key, just whatever solve someone (the person who built/shared this
+// artifact) chose to submit once they finished it themselves. null means no
+// reference solve has been provided; completion status then just reports
+// "filled in", not "matches"/"differs". Each row is 15 chars, '#' for black
+// squares, a letter for every white one -- same format as the progress-code
+// snapshots, so it can be decoded straight from one of those.
+const SOLUTION = null;
+
+const ACROSS = [
+[1,"Add sound effects to"],
+[4,"FIFA official"],
+[7,"Even score"],
+[10,"Business card abbr."],
+[13,"\u201cCaught ya!\u201d"],
+[14,"Prefix for the birds?"],
+[15,"Lovelace of early computing"],
+[16,"___ Proven\u00e7ale (cooking style)"],
+[17,"More uneven, like fabric"],
+[19,"Falls apart"],
+[21,"Incredulous response when a terrible show is on after a good one?"],
+[23,"Descriptor for versatile vacuums"],
+[24,"Eagle\u2019s nest"],
+[25,"Back of a boat"],
+[28,"Eight, in Espa\u00f1a"],
+[30,"Prom kids, for short"],
+[31,"Place to stay where your luggage is stretchy?"],
+[37,"Bird in some clocks"],
+[38,"Was crawling (with)"],
+[42,"Go overboard with your fragrance?"],
+[46,"2008 bailout recipient"],
+[49,"Singing quality"],
+[50,"Cut the grass"],
+[51,"Second part in an instruction manual"],
+[54,"Switzerland\u2019s largest city"],
+[58,"With 63-Across, the last MCU movie ever -- if they chose to focus on just Wolverine and Magneto?"],
+[63,"See 58-Across"],
+[64,"Derogatory term for an idealized female character in fan fiction"],
+[65,"Dark bread"],
+[66,"___-weekly (newspaper category)"],
+[67,"Money made from a bank acct."],
+[68,"Pizza option"],
+[69,"Karl Marx\u2019s \u201c___ Kapital\u201d"],
+[70,"Letters on a Canadian speedometer"],
+[71,"Like many trans allies"],
+[72,"Cashew, e.g."]
+];
+
+const DOWN = [
+[1,"\u201cThat\u2019s a no-no!\u201d"],
+[2,"\u201cThat\u2019s a no-no!\u201d"],
+[3,"Tapioca pearls"],
+[4,"Poker action"],
+[5,"1976 Wimbledon champ Chris"],
+[6,"Dalmatian, traditionally"],
+[7,"Hunting call"],
+[8,"\u201cAmerican ___\u201d (TV singing competition)"],
+[9,"Class that\u2019s a breeze"],
+[10,"They were used in an obstacle course in 2010\u2019s \u201cJackass 3D\u201d"],
+[11,"Medicinal concoction"],
+[12,"Drinks that may display foam art"],
+[18,"\u201cAs an aside ...\u201d"],
+[20,"Opposite direction from WSW"],
+[22,"Missouri monument"],
+[25,"One side in the Pro Bowl"],
+[26,"Strain in the winter"],
+[27,"Private eye, slangily"],
+[29,"\u201cAirplane!\u201d automatic pilot"],
+[32,"Classic Jaguar model driven by Austin Powers"],
+[33,"Mover\u2019s unit"],
+[34,"August, in Paris"],
+[35,"\u201cElectric\u201d fish"],
+[36,"Actor DiCaprio, familiarly"],
+[39,"___ Grand Las Vegas"],
+[40,"Ambient composer Brian"],
+[41,"Morning drops"],
+[43,"Twelve-timer\u2019s attempt?"],
+[44,"Adequate, informally"],
+[45,"Like terra cotta tiles"],
+[46,"Home to the Norse gods"],
+[47,"2017 skating film with Robbie as Harding"],
+[48,"Crystal-lined rocks"],
+[52,"Slang for Portland, OR (based on its airport code)"],
+[53,"U.K. pop trio (Barry, Burns, and McNally) with the 2000 hit song \u201cBack Here\u201d"],
+[55,"Tabriz resident"],
+[56,"Breath mints brand"],
+[57,"Rd. with many lanes"],
+[59,"App with restaurant reviews"],
+[60,"\u201c___ Jeopardy!\u201d (sports trivia show that premiered last month)"],
+[61,"Party on the beach"],
+[62,"Post-Mardi Gras observance"]
+];
+
+let grid = []; // {black, letter}
+let editMode = false;
+let cur = {r:0,c:0,dir:'A'}; // dir A = across, D = down
+let numbers = []; // number per cell, 0 if none
+let acrossStart = {}; // number -> {r,c,len}
+let downStart = {};
+
+function initGrid(){
+  grid = [];
+  for(let r=0;r<SIZE;r++){
+    let row=[];
+    for(let c=0;c<SIZE;c++){
+      row.push({black: pattern[r][c]==='#', letter:''});
+    }
+    grid.push(row);
+  }
+}
+
+function computeNumbers(){
+  numbers = Array.from({length:SIZE},()=>Array(SIZE).fill(0));
+  acrossStart = {}; downStart = {};
+  let n=1;
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if(grid[r][c].black) continue;
+      const leftBlack = (c===0)||grid[r][c-1].black;
+      const rightWhite = (c<SIZE-1)&&!grid[r][c+1].black;
+      const upBlack = (r===0)||grid[r-1][c].black;
+      const downWhite = (r<SIZE-1)&&!grid[r+1][c].black;
+      const startsAcross = leftBlack && rightWhite;
+      const startsDown = upBlack && downWhite;
+      if(startsAcross || startsDown){
+        numbers[r][c]=n;
+        if(startsAcross){
+          let len=0,cc=c;
+          while(cc<SIZE && !grid[r][cc].black){len++;cc++;}
+          acrossStart[n]={r,c,len};
+        }
+        if(startsDown){
+          let len=0,rr=r;
+          while(rr<SIZE && !grid[rr][c].black){len++;rr++;}
+          downStart[n]={r,c,len};
+        }
+        n++;
+      }
+    }
+  }
+}
+
+function render(){
+  computeNumbers();
+  const gridEl = document.getElementById('grid');
+  gridEl.innerHTML='';
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      const div = document.createElement('div');
+      div.className = 'cell ' + (cell.black?'black':'white');
+      div.dataset.r=r; div.dataset.c=c;
+      if(cell.black){
+        div.addEventListener('click', ()=>{ if(editMode) toggleCell(r,c); });
+      } else {
+        if(numbers[r][c]){
+          const num = document.createElement('div');
+          num.className='num';
+          num.textContent = numbers[r][c];
+          div.appendChild(num);
+        }
+        const input = document.createElement('input');
+        input.value = cell.letter;
+        input.autocomplete='off';
+        input.spellcheck=false;
+        // Mouse/touch selection is handled entirely by the click listener below.
+        // (A 'focus' listener here used to pre-empt it: focus fires before click,
+        // so it would move `cur` to the new cell first, making the click handler's
+        // "did I click the already-current cell?" check always true and toggling
+        // orientation on every click instead of just same-cell re-clicks.)
+        input.addEventListener('click', ()=> selectCell(r,c,null,true));
+        input.addEventListener('keydown', (e)=> handleKey(e,r,c));
+        input.addEventListener('input', (e)=> handleInput(e,r,c));
+        div.appendChild(input);
+        div.addEventListener('click', ()=>{ if(editMode) toggleCell(r,c); });
+      }
+      gridEl.appendChild(div);
+    }
+  }
+  renderClues();
+  highlight();
+}
+
+function toggleCell(r,c){
+  grid[r][c].black = !grid[r][c].black;
+  if(grid[r][c].black) grid[r][c].letter='';
+  render();
+  queueSave();
+}
+
+function selectCell(r,c,dir,fromClick){
+  if(grid[r][c].black) return;
+  if(fromClick){
+    if(cur.r===r && cur.c===c){
+      cur.dir = cur.dir==='A' ? 'D' : 'A';
+    } else {
+      cur.dir = bestDirFor(r,c,cur.dir);
+    }
+  }
+  cur.r=r; cur.c=c;
+  if(dir) cur.dir=dir;
+  highlight();
+  focusInput(r,c);
+}
+
+function bestDirFor(r,c,preferred){
+  const inAcross = wordAt(r,c,'A');
+  const inDown = wordAt(r,c,'D');
+  if(preferred==='A' && inAcross) return 'A';
+  if(preferred==='D' && inDown) return 'D';
+  if(inAcross) return 'A';
+  if(inDown) return 'D';
+  return preferred;
+}
+
+function wordAt(r,c,dir){
+  if(dir==='A'){
+    for(const n in acrossStart){
+      const w=acrossStart[n];
+      if(w.r===r && c>=w.c && c<w.c+w.len) return {num:+n,...w};
+    }
+  } else {
+    for(const n in downStart){
+      const w=downStart[n];
+      if(w.c===c && r>=w.r && r<w.r+w.len) return {num:+n,...w};
+    }
+  }
+  return null;
+}
+
+function focusInput(r,c){
+  const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] input`);
+  if(el){
+    el.focus();
+    // Select any existing letter so the next keystroke always replaces it,
+    // rather than depending on wherever the browser happens to leave the
+    // caret (which isn't reliably "at the end" after we set .value via JS,
+    // and with caret-color:transparent the user can't see a stray caret
+    // position to work around it themselves).
+    try{ el.setSelectionRange(0, el.value.length); }catch(e){}
+  }
+}
+
+function handleInput(e,r,c){
+  let v = e.target.value.toUpperCase().replace(/[^A-Z]/g,'');
+  v = v.slice(-1);
+  grid[r][c].letter = v;
+  e.target.value = v;
+  if(v){
+    const next = nextTypingCell(r,c,cur.dir);
+    if(next) selectCell(next.r,next.c);
+  }
+  queueSave();
+  updateCompletionStatus();
+}
+
+// A persistent status, not a one-time popup -- just always reflects whether
+// the grid is currently fully filled in. NOT a correctness check: there's no
+// answer key here to compare against, only "did you fill in every square".
+function isGridFull(){
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if(!grid[r][c].black && !grid[r][c].letter) return false;
+    }
+  }
+  return true;
+}
+function updateCompletionStatus(){
+  const full = isGridFull();
+  const badge = document.getElementById('completionStatus');
+  hamburgerBtn.classList.toggle('complete', full);
+  badge.classList.remove('match','mismatch');
+
+  if(!full){
+    badge.classList.remove('show');
+    badge.textContent = '';
+    return;
+  }
+  badge.classList.add('show');
+
+  if(!SOLUTION){
+    badge.textContent = 'Grid complete';
+    return;
+  }
+  // Comparing against a submitted reference solve, not an official answer
+  // key -- framed as "differs from", never "wrong", and never flags which
+  // individual cells (per earlier discussion, that reads as grading).
+  let mismatches = 0;
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if(grid[r][c].black) continue;
+      if(grid[r][c].letter !== SOLUTION[r][c]) mismatches++;
+    }
+  }
+  if(mismatches===0){
+    badge.textContent = 'Complete — matches our reference solve';
+    badge.classList.add('match');
+  } else {
+    badge.textContent = `Complete — differs from our reference solve in ${mismatches} spot${mismatches===1?'':'s'}`;
+    badge.classList.add('mismatch');
+  }
+}
+
+function handleKey(e,r,c){
+  const key = e.key;
+  if(key==='Backspace' || key==='Delete'){
+    e.preventDefault();
+    if(grid[r][c].letter){
+      // always clear the current cell first, regardless of direction
+      grid[r][c].letter='';
+      e.target.value='';
+    } else if(key==='Backspace'){
+      // already empty: step back one cell in the current word and clear that too
+      const prev = advance(r,c,cur.dir,-1);
+      if(prev){
+        grid[prev.r][prev.c].letter='';
+        selectCell(prev.r,prev.c);
+        focusInput(prev.r,prev.c);
+      }
+    }
+    queueSave();
+    updateCompletionStatus();
+  } else if(key==='ArrowRight'){ arrowMove(r,c,'A',1); e.preventDefault(); }
+  else if(key==='ArrowLeft'){ arrowMove(r,c,'A',-1); e.preventDefault(); }
+  else if(key==='ArrowDown'){ arrowMove(r,c,'D',1); e.preventDefault(); }
+  else if(key==='ArrowUp'){ arrowMove(r,c,'D',-1); e.preventDefault(); }
+  else if(key===' '){ cur.dir = cur.dir==='A'?'D':'A'; highlight(); e.preventDefault(); }
+}
+
+// NYT-style arrow behavior:
+// - Pressing an arrow whose axis matches the current orientation moves the
+//   cursor one cell that way (skipping black squares), same as before.
+// - Pressing an arrow PERPENDICULAR to the current orientation does NOT move
+//   the cursor if the current cell is part of a word in that other direction
+//   -- it just re-orients the highlight to that word, in place. Only if the
+//   current cell has no word running in that direction (an edge case in some
+//   grids) does it jump along that axis to the next cell that does.
+function arrowMove(r,c,axis,step){
+  if(cur.dir !== axis){
+    if(wordAt(r,c,axis)){
+      cur.dir = axis;
+      highlight();
+      return;
+    }
+    const dr = axis==='D' ? step : 0;
+    const dc = axis==='A' ? step : 0;
+    let nr=r+dr, nc=c+dc;
+    while(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE){
+      if(!grid[nr][nc].black && wordAt(nr,nc,axis)){
+        cur.dir = axis;
+        selectCell(nr,nc);
+        return;
+      }
+      nr+=dr; nc+=dc;
+    }
+    cur.dir = axis;
+    highlight();
+    return;
+  }
+  const dr = axis==='D' ? step : 0;
+  const dc = axis==='A' ? step : 0;
+  let nr=r+dr, nc=c+dc;
+  while(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE&&grid[nr][nc].black){ nr+=dr; nc+=dc; }
+  if(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE){
+    selectCell(nr,nc);
+  } else {
+    highlight();
+  }
+}
+
+function advance(r,c,dir,step){
+  const dr = dir==='D'?step:0;
+  const dc = dir==='A'?step:0;
+  let nr=r+dr, nc=c+dc;
+  if(nr<0||nr>=SIZE||nc<0||nc>=SIZE) return null;
+  if(grid[nr][nc].black) return null;
+  return {r:nr,c:nc};
+}
+
+// After typing a letter: jump to the next EMPTY cell in the current word
+// (skipping over ones already filled in). If the rest of the word is full,
+// wrap back around to the first empty cell earlier in that same word. If the
+// whole word is already full, move on to the next word in the same
+// direction, same as NYT's solver.
+function nextTypingCell(r,c,dir){
+  const w = wordAt(r,c,dir);
+  if(!w) return advance(r,c,dir,1);
+  const cells = [];
+  for(let i=0;i<w.len;i++){
+    cells.push(dir==='A' ? {r:w.r,c:w.c+i} : {r:w.r+i,c:w.c});
+  }
+  const idx = cells.findIndex(p=>p.r===r && p.c===c);
+  for(let i=idx+1;i<cells.length;i++){
+    if(!grid[cells[i].r][cells[i].c].letter) return cells[i];
+  }
+  for(let i=0;i<idx;i++){
+    if(!grid[cells[i].r][cells[i].c].letter) return cells[i];
+  }
+  return nextWordFirstCell(w.num, dir);
+}
+
+function nextWordFirstCell(num, dir){
+  const starts = dir==='A' ? acrossStart : downStart;
+  const list = Object.keys(starts).map(Number).sort((a,b)=>a-b);
+  const idx = list.indexOf(num);
+  if(idx===-1) return null;
+  const nextNum = list[(idx+1) % list.length];
+  const w = starts[nextNum];
+  return {r:w.r, c:w.c};
+}
+
+function highlight(){
+  document.querySelectorAll('#grid .cell').forEach(el=>el.classList.remove('hi','hi2'));
+  const w = wordAt(cur.r,cur.c,cur.dir);
+  if(w){
+    for(let i=0;i<w.len;i++){
+      const rr = cur.dir==='A'? w.r : w.r+i;
+      const cc = cur.dir==='A'? w.c+i : w.c;
+      const el = document.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`);
+      if(el) el.classList.add('hi');
+    }
+  }
+  const curEl = document.querySelector(`.cell[data-r="${cur.r}"][data-c="${cur.c}"]`);
+  if(curEl) curEl.classList.add('hi2');
+  updateActiveClue(w);
+}
+
+function updateActiveClue(w){
+  document.querySelectorAll('.clue').forEach(el=>el.classList.remove('active','crossing'));
+  if(!w) return;
+  const id = (cur.dir==='A'?'a-':'d-')+w.num;
+  const el = document.getElementById(id);
+  if(el){
+    el.classList.add('active');
+    if(typeof el.scrollIntoView === 'function') el.scrollIntoView({block:'nearest', behavior:'instant'});
+  }
+  // The crossing word at the current cell -- highlighted (not bold) so you can
+  // see at a glance what the intersecting clue is as you move through a word,
+  // without it reading as "also selected".
+  const crossDir = cur.dir==='A' ? 'D' : 'A';
+  const crossWord = wordAt(cur.r, cur.c, crossDir);
+  if(crossWord){
+    const crossEl = document.getElementById((crossDir==='A'?'a-':'d-')+crossWord.num);
+    if(crossEl){
+      crossEl.classList.add('crossing');
+      if(typeof crossEl.scrollIntoView === 'function') crossEl.scrollIntoView({block:'nearest', behavior:'instant'});
+    }
+  }
+}
+
+function renderClues(){
+  const aEl = document.getElementById('acrossList');
+  const dEl = document.getElementById('downList');
+  aEl.innerHTML=''; dEl.innerHTML='';
+  ACROSS.forEach(([num,text])=>{
+    const div = document.createElement('div');
+    div.className='clue'; div.id='a-'+num;
+    div.innerHTML = `<b>${num}.</b>${text}`;
+    div.addEventListener('click', ()=>{
+      const w = acrossStart[num];
+      if(w){ cur.dir='A'; selectCell(w.r,w.c); }
+    });
+    aEl.appendChild(div);
+  });
+  DOWN.forEach(([num,text])=>{
+    const div = document.createElement('div');
+    div.className='clue'; div.id='d-'+num;
+    div.innerHTML = `<b>${num}.</b>${text}`;
+    div.addEventListener('click', ()=>{
+      const w = downStart[num];
+      if(w){ cur.dir='D'; selectCell(w.r,w.c); }
+    });
+    dEl.appendChild(div);
+  });
+}
+
+function showBanner(msg,ms=2200){
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.style.display='block';
+  clearTimeout(showBanner._t);
+  showBanner._t = setTimeout(()=>{ b.style.display='none'; }, ms);
+}
+
+document.getElementById('editBtn').addEventListener('click', (e)=>{
+  editMode = !editMode;
+  e.target.classList.toggle('active', editMode);
+  showBanner(editMode? 'Tap any square to toggle black / white. Numbers update live.' : 'Grid editing off — back to typing letters.');
+});
+
+// ---- Focus mode: hides header/toolbar, grid fills the viewport height,
+// clue panel fills the remaining width. Toolbar becomes a hamburger dropdown. ----
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const toolbarEl = document.getElementById('toolbar');
+const appEl = document.getElementById('app');
+
+// CSS 100vh/100dvh assumes #app starts at the very top of the viewport, which
+// isn't necessarily true here -- if this is embedded in something with its own
+// chrome above it (e.g. an artifact viewer's header bar), #app actually starts
+// lower than that, and 100vh overshoots the real available space by exactly
+// however tall that chrome is. Measuring #app's actual on-screen position and
+// sizing off THAT is correct regardless of what (if anything) sits above it.
+function sizeFocusMode(){
+  if(!document.body.classList.contains('focus-mode')) return;
+  const top = appEl.getBoundingClientRect().top;
+  const bottomMargin = 12;
+  const available = window.innerHeight - top - bottomMargin;
+  appEl.style.height = Math.max(200, available) + 'px';
+}
+window.addEventListener('resize', sizeFocusMode);
+
+// Align the dropdown's top-right corner exactly with #cluesPanel's own
+// top-right corner (same measure-don't-guess approach as sizeFocusMode),
+// so it sits flush against the panel -- covering the Across/Down header
+// strip underneath rather than floating with a gap above or beside it.
+const cluesPanelEl = document.getElementById('cluesPanel');
+function positionToolbarDropdown(){
+  if(!document.body.classList.contains('focus-mode')) return;
+  const rect = cluesPanelEl.getBoundingClientRect();
+  toolbarEl.style.top = rect.top + 'px';
+  toolbarEl.style.right = (window.innerWidth - rect.right) + 'px';
+  toolbarEl.style.left = 'auto';
+}
+window.addEventListener('resize', positionToolbarDropdown);
+
+document.getElementById('focusBtn').addEventListener('click', (e)=>{
+  document.body.classList.add('focus-mode');
+  toolbarEl.classList.remove('open');
+  const raf = window.requestAnimationFrame || (fn => setTimeout(fn, 16));
+  raf(()=>{ sizeFocusMode(); positionToolbarDropdown(); });
+});
+hamburgerBtn.addEventListener('click', (e)=>{
+  e.stopPropagation(); // don't let this immediately trigger the outside-click-closes listener below
+  positionToolbarDropdown();
+  toolbarEl.classList.toggle('open');
+});
+// Click anywhere outside the open dropdown closes it -- the standard way people
+// expect to dismiss this kind of menu, on top of clicking the hamburger again.
+document.addEventListener('click', (e)=>{
+  if(toolbarEl.classList.contains('open') && !toolbarEl.contains(e.target)){
+    toolbarEl.classList.remove('open');
+  }
+});
+// Any toolbar action closes the dropdown afterward, and exiting focus mode
+// is just another toolbar button so it's reachable from the same menu.
+const exitFocusBtn = document.createElement('button');
+exitFocusBtn.id = 'exitFocusBtn';
+exitFocusBtn.textContent = 'Exit focus mode';
+exitFocusBtn.addEventListener('click', ()=>{
+  document.body.classList.remove('focus-mode');
+  toolbarEl.classList.remove('open');
+  appEl.style.height = ''; // hand sizing back to normal-mode CSS
+});
+toolbarEl.appendChild(exitFocusBtn);
+toolbarEl.addEventListener('click', (e)=>{
+  if(document.body.classList.contains('focus-mode') && e.target.tagName==='BUTTON'){
+    toolbarEl.classList.remove('open');
+  }
+});
+
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) if(!grid[r][c].black) grid[r][c].letter='';
+  render();
+  queueSave();
+  updateCompletionStatus();
+});
+
+// ---- Export/import: carries your progress across versions ----
+// Autosave only protects reopening THIS SAME artifact -- if a new version of this
+// puzzle gets shipped (a bug fix, a layout tweak, anything), it's a new artifact
+// with its own separate storage, even with an unchanged PUZZLE_ID. There's no way
+// for a new version to reach into an old one's storage, so this is a manual
+// safety net: grab a code before you expect an update, restore it after.
+function encodeProgress(){
+  // base64 of the same {rows:[...]} snapshot already used for autosave, so
+  // export/import and save/restore always stay in sync with each other.
+  return btoa(unescape(encodeURIComponent(currentSnapshot())));
+}
+function decodeProgress(code){
+  const data = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+  if(!data.rows || data.rows.length!==SIZE) throw new Error('Code doesn\'t match this puzzle\'s grid size.');
+  return data;
+}
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('exportText');
+  ta.value = encodeProgress();
+  document.getElementById('exportModal').classList.add('open');
+  ta.focus();
+  ta.select();
+  if(document.body.classList.contains('focus-mode')) toolbarEl.classList.remove('open');
+});
+document.getElementById('closeExportBtn').addEventListener('click', ()=>{
+  document.getElementById('exportModal').classList.remove('open');
+});
+document.getElementById('copyToClipboardBtn').addEventListener('click', async ()=>{
+  const ta = document.getElementById('exportText');
+  ta.focus();
+  ta.select();
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(ta.value);
+      showBanner('Copied to clipboard.');
+    } else if(document.execCommand('copy')){
+      showBanner('Copied to clipboard.');
+    } else {
+      throw new Error('copy command unavailable');
+    }
+  }catch(err){
+    // Sandboxed contexts often block programmatic clipboard access entirely --
+    // the text is already selected either way, so manual copy still works.
+    showBanner('Couldn\'t auto-copy here — the text is selected, use Ctrl/Cmd+C.');
+  }
+});
+
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importText').value = '';
+  document.getElementById('importModal').classList.add('open');
+  document.getElementById('importText').focus();
+  if(document.body.classList.contains('focus-mode')) toolbarEl.classList.remove('open');
+});
+document.getElementById('closeImportBtn').addEventListener('click', ()=>{
+  document.getElementById('importModal').classList.remove('open');
+});
+document.getElementById('doImportBtn').addEventListener('click', ()=>{
+  const code = document.getElementById('importText').value;
+  if(!code.trim()) return;
+  try{
+    const data = decodeProgress(code);
+    for(let r=0;r<SIZE;r++){
+      for(let c=0;c<SIZE;c++){
+        const ch = data.rows[r][c];
+        if(ch!=='#' && ch!=='.') grid[r][c].letter = ch;
+      }
+    }
+    render();
+    queueSave();
+    document.getElementById('importModal').classList.remove('open');
+    showBanner('Progress restored from code.');
+    updateCompletionStatus();
+  }catch(err){
+    showBanner('That code didn\'t look right -- double-check it was copied in full.');
+  }
+});
+
+// ---- Persistence: autosaves your letters + any grid fixes, restores on reopen ----
+const PUZZLE_ID = 'ccp-2026-08-14-and-my-ax';
+let saveTimer = null;
+let lastSavedSnapshot = null;
+let saveErrorLogged = false;
+
+// Works two ways: window.storage (Claude's artifact storage API, when this
+// runs inside a Claude artifact) or localStorage (a normal browser, when
+// this is hosted standalone -- GitHub Pages, Netlify, opened as a plain
+// file, whatever). Same file, same behavior, whichever context it's in.
+const storageAdapter = {
+  async get(key){
+    if(window.storage && typeof window.storage.get === 'function'){
+      try{ return await window.storage.get(key, false); }
+      catch(e){ return null; } // no saved value yet, or the API itself unavailable
+    }
+    try{
+      const raw = window.localStorage.getItem('crossword:'+key);
+      return raw===null ? null : {key, value: raw};
+    }catch(e){ return null; } // e.g. localStorage blocked (private browsing, etc.)
+  },
+  async set(key, value){
+    if(window.storage && typeof window.storage.set === 'function'){
+      try{ return await window.storage.set(key, value, false); }
+      catch(e){ return null; }
+    }
+    try{
+      window.localStorage.setItem('crossword:'+key, value);
+      return {key, value};
+    }catch(e){ return null; }
+  }
+};
+
+function queueSave(){
+  clearTimeout(saveTimer);
+  // Debounced generously: typing a crossword involves lots of keystrokes with
+  // normal thinking pauses well over a few hundred ms, so a short debounce
+  // ends up firing a save on nearly every letter and can trip storage rate
+  // limits. visibilitychange/pagehide below covers the "closed before the
+  // debounce fired" case, so this can safely be long.
+  saveTimer = setTimeout(()=>saveState(), 1500);
+}
+
+function currentSnapshot(){
+  const rows = [];
+  for(let r=0;r<SIZE;r++){
+    let row = '';
+    for(let c=0;c<SIZE;c++){
+      const cell = grid[r][c];
+      row += cell.black ? '#' : (cell.letter || '.');
+    }
+    rows.push(row);
+  }
+  return JSON.stringify({rows});
+}
+
+async function saveState(attempt=0){
+  const snapshot = currentSnapshot();
+  if(snapshot === lastSavedSnapshot) return; // nothing changed since last successful save
+  try{
+    const result = await storageAdapter.set(PUZZLE_ID, snapshot);
+    if(result){
+      lastSavedSnapshot = snapshot;
+      saveErrorLogged = false;
+    } else if(attempt < 1){
+      // a falsy result (not a thrown error) can mean a transient failure --
+      // worth one retry
+      setTimeout(()=>saveState(attempt+1), 1000);
+    }
+  }catch(err){
+    if(attempt < 1){
+      setTimeout(()=>saveState(attempt+1), 1000);
+    } else if(!saveErrorLogged){
+      // Log once, not on every keystroke, so a real underlying issue is
+      // still visible without spamming the console while someone plays.
+      console.warn('Crossword autosave is unavailable right now (progress will still show in this session, but may not persist if you close the tab):', err);
+      saveErrorLogged = true;
+    }
+  }
+}
+
+// Best-effort final save if the tab is hidden/closed before the debounce fires
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveState(); });
+window.addEventListener('pagehide', ()=> saveState());
+
+async function loadState(){
+  try{
+    const res = await storageAdapter.get(PUZZLE_ID);
+    if(!res || !res.value) return false;
+    const data = JSON.parse(res.value);
+    if(!data.rows || data.rows.length!==SIZE) return false;
+    for(let r=0;r<SIZE;r++){
+      for(let c=0;c<SIZE;c++){
+        const ch = data.rows[r][c];
+        pattern[r] = pattern[r].substring(0,c) + (ch==='#'?'#':'.') + pattern[r].substring(c+1);
+        if(ch!=='#' && ch!=='.') restoredLetters[r][c] = ch;
+      }
+    }
+    lastSavedSnapshot = res.value;
+    return true;
+  }catch(err){ return false; } // no saved state yet, or storage unavailable
+}
+
+let restoredLetters = Array.from({length:SIZE},()=>Array(SIZE).fill(''));
+
+(async function boot(){
+  const restored = await loadState();
+  initGrid();
+  if(restored){
+    for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
+      if(restoredLetters[r][c]) grid[r][c].letter = restoredLetters[r][c];
+    }
+    showBanner('Restored your progress from last time.');
+  }
+  render();
+  updateCompletionStatus();
+})();
+
+document.getElementById('revealBtn').addEventListener('click', ()=>{
+  showBanner("This transcription doesn't include the solved answers — reveal isn't available, but Check letters will flag blanks.");
+});
+
+document.getElementById('checkBtn').addEventListener('click', ()=>{
+  let blanks=0, total=0;
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
+    if(!grid[r][c].black){ total++; if(!grid[r][c].letter) blanks++; }
+  }
+  showBanner(blanks===0 ? 'Every square is filled in!' : `${blanks} of ${total} squares still empty.`, 2600);
+});
+
+// grid initialization + first render happens in boot() above, after checking for saved progress
+</script>
+</body>
+</html>

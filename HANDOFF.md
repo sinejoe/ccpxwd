@@ -125,10 +125,30 @@ in `working-files/crossword_0814_full_toolset.html`):
 
 ## Reference solve ("SOLUTION")
 
-`SOLUTION` is `null` by default. When set (same row-string format as
-`pattern`, letters instead of `.`), the completion status badge
-compares the solver's grid against it once every square is filled,
-and reports either "matches" or "differs ... in N spot(s)".
+There is no plaintext reference solve anywhere in this repo or shipped page
+(added Aug 2026, after the person explicitly asked that a view-source/bot
+couldn't recover the answer letters). Instead, `solution-hashes.txt` at the
+repo root holds one salted SHA-256 hash per Across/Down entry (`1A-<hash>`,
+`1D-<hash>`, ...). The browser hashes whatever the player typed for each
+entry and compares hashes — this can report *how many answers* don't match,
+never *which letters* are right, and the actual solve can't be recovered
+from the repo even by someone with full read access to it.
+
+If `solution-hashes.txt` is missing/unfetchable, the completion badge just
+says "Grid complete" (no reference solve available). Once loaded, the badge
+reports either "matches" or "differs ... in N answer(s)".
+
+**Security note, stated plainly:** this is still a deterrent, not a vault.
+`SOLUTION_SALT` (in `index.html`) is public by necessity — the client has to
+use it too — so it doesn't add secrecy beyond namespacing the hashes. Per-
+answer hashing was a deliberate tradeoff for a mismatch *count*: hashing the
+whole grid as one blob would be strictly more secure (no oracle) but could
+only report a binary match/no-match, and the person preferred the count. A
+scripted client could in principle narrow down individual answers faster
+than blind guessing by watching the count shift as it tries words — same
+category of accepted risk as the `ADMIN_HASH` gate below. What this *does*
+achieve: nobody reading the repo, `index.html`'s source, or
+`solution-hashes.txt` directly can recover the answer text.
 
 **Framing rules the person was explicit about, twice — do not
 deviate:**
@@ -142,19 +162,20 @@ deviate:**
   favor of a quiet status badge, because repeatedly clearing/refilling
   cells while double-checking kept re-triggering it.
 
-`SOLUTION` still has to be baked into the file at build/publish time
-and redeployed — there's no server, so nothing can write to it at
+`solution-hashes.txt` still has to be baked/replaced at build/publish
+time and redeployed — there's no server, so nothing can write to it at
 runtime for real. What *does* exist now (added Aug 2026, after
-explicit discussion) is an admin-only helper that generates the
-paste-ready `SOLUTION` block from whatever grid you've solved in the
-normal UI, so you don't have to hand-transpose 15×15 letters:
+explicit discussion) is an admin-only helper that generates a
+paste-ready `solution-hashes.txt` from whatever grid you've solved in
+the normal UI, so you don't have to hand-hash 78+ answers yourself:
 
 - Load the page with `?admin=1` in the URL — this reveals a
   passphrase-gated panel (hidden from normal players; the panel
-  itself is inert without the passphrase). The SHA-256 hash of the
-  passphrase lives in the script as `ADMIN_HASH`; the passphrase
-  itself isn't stored anywhere in the repo, only given to the person
-  who set it up.
+  itself is inert without the passphrase, and easy to miss since it's
+  a small dashed box below the footer, not a popup). The SHA-256 hash
+  of the passphrase lives in the script as `ADMIN_HASH`; the
+  passphrase itself isn't stored anywhere in the repo, only given to
+  the person who set it up.
 - This is explicitly **not** real security — it's a deterrent against
   casual snooping, not a determined attacker (the hash is visible in
   page source and could be brute-forced offline). Accepted tradeoff:
@@ -163,17 +184,19 @@ normal UI, so you don't have to hand-transpose 15×15 letters:
   moving off static GitHub Pages onto something with a backend, which
   was explicitly ruled out in favor of staying dependency-free.
 - Once unlocked, solve the puzzle in the actual grid (same UI
-  everyone else uses), then click "Generate SOLUTION block from my
-  grid" — it reads the live `grid` state, not a separate code/import
+  everyone else uses), then click "Generate solution-hashes.txt from
+  my grid" — it reads the live `grid` state, not a separate code/import
   step, so it can't drift out of sync with whatever puzzle is
   currently loaded. Paste the output over the existing
-  `const SOLUTION = [...]` and redeploy.
+  `solution-hashes.txt` and redeploy.
 - This intentionally does **not** revive the old base64
   export/import ("progress code") flow from
-  `working-files/crossword_0814_full_toolset.html` — going straight
-  from live grid to paste-ready block skips a decode step. That
-  mechanism is still there in the full-toolset build if ever needed
-  for a different purpose.
+  `working-files/crossword_0814_full_toolset.html` as the *primary*
+  path — going straight from live grid to paste-ready hashes skips a
+  decode step. That mechanism is still there in the full-toolset
+  build, and was in fact used once already: a saved progress code
+  from that build was decoded outside the app to cross-check this
+  week's `solution-hashes.txt` before it shipped.
 
 ## UI/UX details worth preserving (each fixed a reported bug)
 

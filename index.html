@@ -398,7 +398,7 @@
 
 <footer>Fills in and remembers your progress in this browser. When the grid's fully filled, the status badge above the grid will say whether it matches our reference solve.</footer>
 
-<!-- Admin-only: generates a pasteable SOLUTION block from whatever grid you've
+<!-- Admin-only: generates a pasteable solution-hashes.txt from whatever grid you've
      solved in the normal UI above. Hidden unless the page is loaded with
      ?admin=1, and passphrase-gated even then -- this is a deterrent against
      casual snooping, not real security (the hash below is visible in page
@@ -416,10 +416,11 @@
   </div>
   <div id="adminTools" style="display:none;">
     <p>Solve the puzzle above in the normal grid, then click below to generate
-       the <code>SOLUTION</code> block for this week's puzzle. Paste the
-       result over the existing <code>const SOLUTION = [...]</code> in this
-       file and redeploy.</p>
-    <button id="adminGenerate" type="button">Generate SOLUTION block from my grid</button>
+       <code>solution-hashes.txt</code> for this week's puzzle -- one salted
+       hash per Across/Down answer, no actual letters. Paste the result over
+       the existing <code>solution-hashes.txt</code> file in the repo root
+       and redeploy.</p>
+    <button id="adminGenerate" type="button">Generate solution-hashes.txt from my grid</button>
     <span id="adminGenMsg" style="margin-left:8px;"></span>
     <textarea id="adminOutput" readonly rows="17" style="display:none; width:100%; margin-top:10px; font-family:monospace; font-size:12px;"></textarea>
     <button id="adminCopy" type="button" style="display:none; margin-top:6px;">Copy to clipboard</button>
@@ -454,28 +455,45 @@ let pattern = [
 
 // Optional reference solve for match/mismatch comparison -- NOT an official
 // answer key, just whatever solve someone (the person who built/shared this
-// artifact) chose to submit once they finished it themselves. null means no
-// reference solve has been provided; completion status then just reports
-// "filled in", not "matches"/"differs". Each row is 15 chars, '#' for black
-// squares, a letter for every white one -- same format as the progress-code
-// snapshots, so it can be decoded straight from one of those.
-const SOLUTION = [
-"DUB#REF#TIE#TEL",
-"OHO#AVI#ADA#ALA",
-"NUBBIER#LOSESIT",
-"THATSREALLYNEXT",
-"###WETDRY#AERIE",
-"AFT###OCHO##SRS",
-"FLEXBAGHOTEL###",
-"CUCKOO###TEEMED",
-"###EXUDECOLOGNE",
-"AIG##TONE###MOW",
-"STEPB#ZURICH###",
-"GOODBYEFAREWELL",
-"ANDXMEN#MARYSUE",
-"RYE#ALT#INT#PAN",
-"DAS#KPH#CIS#NUT"
-];
+// artifact) chose to submit once they finished it themselves.
+//
+// The actual answer letters are never shipped anywhere in this file or repo.
+// solution-hashes.txt holds one SHA-256 hash per Across/Down entry (e.g.
+// "1A-<hash>"), each hash covering that whole answer word, salted with
+// SOLUTION_SALT below. The browser hashes whatever the player typed for each
+// entry and compares hashes -- it can tell you how many answers don't match,
+// never which letters are right. This is a deterrent, not a vault: SOLUTION_SALT
+// is public (has to be, the client needs it too), and a scripted client could
+// in principle narrow individual answers down faster than guessing blind by
+// watching how the mismatch count changes as it tries words -- same accepted
+// tradeoff as the admin passphrase gate elsewhere in this file. See HANDOFF.md.
+const SOLUTION_SALT = 'ccpxwd-2026-ref-solve';
+let SOLUTION_HASHES = null; // null = no reference solve available/loaded
+async function loadSolutionHashes(){
+  try{
+    const res = await fetch('solution-hashes.txt', {cache:'no-store'});
+    if(!res.ok) return;
+    const text = await res.text();
+    const map = {};
+    for(const line of text.split('\n')){
+      const trimmed = line.trim();
+      if(!trimmed) continue;
+      const idx = trimmed.indexOf('-');
+      if(idx<0) continue;
+      map[trimmed.slice(0,idx)] = trimmed.slice(idx+1);
+    }
+    SOLUTION_HASHES = map;
+  }catch(err){ /* no reference solve available right now */ }
+}
+function wordText(start,dir){
+  let word='';
+  for(let i=0;i<start.len;i++){
+    const r = start.r + (dir==='D'?i:0);
+    const c = start.c + (dir==='A'?i:0);
+    word += grid[r][c].letter || ' ';
+  }
+  return word;
+}
 
 const ACROSS = [
 [1,"Add sound effects to"],
@@ -724,7 +742,8 @@ function isGridFull(){
   }
   return true;
 }
-function updateCompletionStatus(){
+let completionStatusToken = 0;
+async function updateCompletionStatus(){
   const full = isGridFull();
   const badge = document.getElementById('completionStatus');
   hamburgerBtn.classList.toggle('complete', full);
@@ -737,25 +756,33 @@ function updateCompletionStatus(){
   }
   badge.classList.add('show');
 
-  if(!SOLUTION){
+  if(!SOLUTION_HASHES){
     badge.textContent = 'Grid complete';
     return;
   }
   // Comparing against a submitted reference solve, not an official answer
   // key -- framed as "differs from", never "wrong", and never flags which
-  // individual cells (per earlier discussion, that reads as grading).
-  let mismatches = 0;
-  for(let r=0;r<SIZE;r++){
-    for(let c=0;c<SIZE;c++){
-      if(grid[r][c].black) continue;
-      if(grid[r][c].letter !== SOLUTION[r][c]) mismatches++;
-    }
+  // individual answer (per earlier discussion, that reads as grading). Each
+  // Across/Down entry is hashed and compared whole -- see SOLUTION_HASHES
+  // above for why, and why this only yields a count, not locations.
+  const token = ++completionStatusToken; // avoid a stale async result clobbering a newer one
+  let mismatches = 0, total = 0;
+  for(const [num,start] of Object.entries(acrossStart)){
+    total++;
+    const hash = await sha256hex(SOLUTION_SALT + wordText(start,'A'));
+    if(hash !== SOLUTION_HASHES[num+'A']) mismatches++;
   }
+  for(const [num,start] of Object.entries(downStart)){
+    total++;
+    const hash = await sha256hex(SOLUTION_SALT + wordText(start,'D'));
+    if(hash !== SOLUTION_HASHES[num+'D']) mismatches++;
+  }
+  if(token !== completionStatusToken) return;
   if(mismatches===0){
     badge.textContent = 'Well done! Your answers match what we think is the complete correct puzzle solve. Check next week’s paper for official answers!';
     badge.classList.add('match');
   } else {
-    badge.textContent = `Complete — our solve is a little different, in ${mismatches} spot${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
+    badge.textContent = `Complete — our solve is a little different, in ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
     badge.classList.add('mismatch');
   }
 }
@@ -1115,7 +1142,7 @@ async function loadState(){
 let restoredLetters = Array.from({length:SIZE},()=>Array(SIZE).fill(''));
 
 (async function boot(){
-  const restored = await loadState();
+  const [restored] = await Promise.all([loadState(), loadSolutionHashes()]);
   initGrid();
   if(restored){
     for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
@@ -1129,7 +1156,7 @@ let restoredLetters = Array.from({length:SIZE},()=>Array(SIZE).fill(''));
 
 // grid initialization + first render happens in boot() above, after checking for saved progress
 
-// --- Admin: generate a SOLUTION block from the currently-solved grid ---
+// --- Admin: generate solution-hashes.txt from the currently-solved grid ---
 // See the HTML comment above #adminPanel for the threat-model tradeoff here.
 const ADMIN_HASH = '04a2d53d956589e857c4fe335f5a5518c7e393621c79d9c2189ddeb60464417c';
 async function sha256hex(str){
@@ -1149,22 +1176,23 @@ document.getElementById('adminUnlock').addEventListener('click', async ()=>{
     msg.textContent = 'Wrong passphrase.';
   }
 });
-document.getElementById('adminGenerate').addEventListener('click', ()=>{
+document.getElementById('adminGenerate').addEventListener('click', async ()=>{
   const genMsg = document.getElementById('adminGenMsg');
   if(!isGridFull()){
     genMsg.textContent = 'Fill in the whole grid first.';
     return;
   }
-  genMsg.textContent = '';
-  const rows = [];
-  for(let r=0;r<SIZE;r++){
-    let row = '';
-    for(let c=0;c<SIZE;c++) row += grid[r][c].black ? '#' : grid[r][c].letter;
-    rows.push(row);
+  genMsg.textContent = 'Hashing...';
+  const lines = [];
+  for(const [num,start] of Object.entries(acrossStart)){
+    lines.push(num+'A-'+await sha256hex(SOLUTION_SALT + wordText(start,'A')));
   }
-  const block = 'const SOLUTION = [\n' + rows.map(r=>`"${r}"`).join(',\n') + '\n];';
+  for(const [num,start] of Object.entries(downStart)){
+    lines.push(num+'D-'+await sha256hex(SOLUTION_SALT + wordText(start,'D')));
+  }
+  genMsg.textContent = '';
   const out = document.getElementById('adminOutput');
-  out.value = block;
+  out.value = lines.join('\n') + '\n';
   out.style.display = 'block';
   document.getElementById('adminCopy').style.display = 'inline-block';
 });

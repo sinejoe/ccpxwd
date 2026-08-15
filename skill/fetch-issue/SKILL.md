@@ -6,92 +6,71 @@ description: Find this week's (or a specific week's) Charleston City Paper issue
 # Fetch this week's Charleston City Paper issue
 
 First half of the two-step weekly pipeline. This skill's only job is to
-locate the crossword page for a given week and save two raw artifacts to
+locate the crossword page for a given week and save raw artifacts to
 `working-files/<date>/` — it does **not** parse the grid or clues. Hand
 off to `charleston-citypaper-build-puzzle-json` for that.
 
-Splitting it this way matters because this half is the fragile,
-judgment-heavy part (page numbers drift, Issuu's rendering can change,
-finding the right page is a visual task) while the parsing half is
-mechanical and should be re-runnable without re-fetching anything if the
-JSON comes out wrong.
+## Step 1 — Run the fetch script
 
-## Step 1 — Find the issue and the crossword page
-
-Read `../references/workflow_notes.md` in full — it has the exact Issuu
-URL pattern, how to pull the document ID from the JSON-LD block, and how
-to use the reader's thumbnail-grid view to spot the crossword page
-visually. This part is genuinely variable week to week; don't guess a
-page number from memory, verify it against what's actually on the page.
-
-Confirm before continuing: the issue date (from the doc slug, e.g.
-`260814fullbookweb` → 2026-08-14) and the page number within it.
-
-## Step 2 — Capture the full-resolution page image
-
-With the crossword page open in `claude-in-chrome`, fetch the
-full-resolution image (`image.isu.pub/<doc-id>/jpg/page_<n>.jpg`) *inside
-the browser tab* — not via `bash`/`web_fetch`, which can't reach that
-host (see workflow_notes.md item 5 for why).
-
-Get the bytes out of the browser and onto disk via a base64 round-trip,
-since page tools return text, not binary:
-
-1. Use `javascript_tool` to `fetch()` the image, read it as a `Blob`,
-   convert to a base64 string (`FileReader.readAsDataURL` then strip the
-   `data:image/jpeg;base64,` prefix, or equivalent), and return that
-   string as the tool result.
-2. `Write` the base64 text to `working-files/<date>/page.jpg.b64`.
-3. Decode it to real binary with `base64 -d`:
-   ```bash
-   base64 -d working-files/<date>/page.jpg.b64 > working-files/<date>/page.jpg
-   ```
-4. Confirm it's a valid image (`file working-files/<date>/page.jpg` should
-   say JPEG) before moving on, then delete the `.b64` intermediate.
-
-## Step 3 — Capture the SVG text layer
-
-Still on the same page, extract the real glyph-position text layer
-instead of relying on a screenshot read — see workflow_notes.md item 6
-for how to find the right `<svg>` (the one with thousands of `<text>`
-children) and why this matters (it caught a real duplicate-clue-text
-case before that a screenshot read couldn't have distinguished).
-
-Via `javascript_tool`, collect every `<text>` node's content and its
-`transform="matrix(...)"` position, and return it as JSON shaped like:
-
-```json
-[
-  {"x": 123.4, "y": 88.1, "text": "1"},
-  {"x": 140.2, "y": 88.1, "text": "Add "},
-  ...
-]
+```bash
+python3 skill/scripts/fetch_issue.py                    # newest available issue
+python3 skill/scripts/fetch_issue.py --date 2026-08-07   # a specific week
 ```
 
-`Write` this directly to `working-files/<date>/svg_text.json` — no
-base64 needed, it's already text.
+This is plain HTTP + regex against Issuu's static endpoints — **no
+browser automation needed** (that used to be the whole point of this
+skill; it no longer is, see `../references/workflow_notes.md` for why).
+It:
 
-## Step 4 — Save fetch metadata
+1. Finds the issue's doc page URL for the requested (or newest) date.
+2. Pulls the Issuu doc id out of the doc page's JSON-LD block.
+3. Scans that issue's pages via `svg.issuu.com/<doc-id>/page_<n>.svg`
+   looking for the crossword's byline text, stopping at the first match
+   — a few seconds for a typical ~24-page issue, no visual judgment
+   needed since the page number drifts weekly and can't be assumed.
+4. Extracts the embedded full-resolution page JPEG and the full vector
+   text layer (with real page-pixel coordinates) from that one page's
+   SVG file, and writes:
+   - `working-files/<date>/page.jpg`
+   - `working-files/<date>/svg_text.json` — `{source, nodes: [{x, y,
+     text}, ...], flatText}`
+   - `working-files/<date>/meta.json` — `date`, `docId`, `pageNumber`,
+     `sourceUrl` filled in; `puzzleTitle`/`byline`/`constructor` left
+     `null` (see Step 2)
+5. Best-effort crops the **previous** week's printed solution grid (this
+   week's page always includes it) into
+   `working-files/<the-prior-week's-date>/printed_solution_grid_CANDIDATE.jpg`
+   — unverified bounds, confirm visually before trusting it for
+   anything. See "Last week's solution grid" below.
 
-`Write` `working-files/<date>/meta.json`:
+If the script's page-discovery scan fails (crossword byline text
+doesn't match, e.g. a special guide issue with a different or no
+puzzle), fall back to the manual browser method in
+`../references/workflow_notes.md` ("Manual/fallback: finding the page
+visually").
 
-```json
-{
-  "date": "2026-08-14",
-  "docId": "<issuu doc id>",
-  "pageNumber": 23,
-  "sourceUrl": "https://issuu.com/charlestoncitypaper/docs/260814fullbookweb",
-  "puzzleTitle": "“And My Ax!”",
-  "byline": "Jonesin' by Matt Jones — swapping one for the other.",
-  "constructor": "Matt Jones"
-}
-```
+## Step 2 — Fill in title/byline/constructor
 
-`puzzleTitle`/`byline` are printed on the page itself near the grid —
-transcribe them now while you're already looking at the page, so the
-build step doesn't have to re-derive them from raw text-node positions.
+The script can't reliably pull `puzzleTitle` / `byline` / `constructor`
+out of the raw text layer (the title is often a themed phrase mixed in
+with grid-adjacent text, not a clean labeled field). Read
+`working-files/<date>/svg_text.json`'s `flatText` (or just look at
+`page.jpg`) and fill those three fields into `meta.json` by hand before
+moving on to `build-puzzle-json`.
 
-## Step 5 — Done
+## Last week's solution grid
+
+Every issue prints last week's completed grid as a small solution key.
+The fetch script opportunistically crops it and drops it in the *prior*
+week's `working-files/` directory, since that's the puzzle it belongs
+to. Treat it strictly as archival source material for whoever builds
+that prior week's puzzle JSON later — it is not wired into anything on
+its own, and turning it into an on-site "official answer key" feature is
+a separate product decision. Discuss with the user first per the
+`SOLUTION`-framing rules in the repo's `CLAUDE.md` before building
+anything that surfaces it to players.
+
+## Step 3 — Done
 
 Tell the user the raw material is saved to `working-files/<date>/`
 (`page.jpg`, `svg_text.json`, `meta.json`) and that

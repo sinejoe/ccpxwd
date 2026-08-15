@@ -13,9 +13,9 @@ independently:
 
 1. **`fetch-issue/SKILL.md`** — locates the current (or a specified)
    week's issue on Issuu, finds the crossword page inside it, and saves
-   the raw page image + SVG text layer to `working-files/<date>/`. This
-   is the part that needs a live browser (`claude-in-chrome`) and human
-   judgment about which page is actually the crossword.
+   the raw page image + SVG text layer to `working-files/<date>/`. Runs
+   as a plain script (`skill/scripts/fetch_issue.py`, no browser
+   automation needed) — see that skill for the (rare) manual fallback.
 2. **`build-puzzle-json/SKILL.md`** — takes that `working-files/<date>/`
    directory and turns it into `puzzles/<date>.json` (grid pattern,
    clues, header text) plus a new entry in `puzzles/index.json`. Pure

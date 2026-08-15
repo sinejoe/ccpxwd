@@ -29,10 +29,15 @@ summary** — it's the cross-check for Step 3.
 
 ## Step 2 — Reconstruct clue text from the SVG text layer
 
-Read `working-files/<date>/svg_text.json`. Group nodes by their `y`
-value (rounded — glyphs on the same printed line share the same
-y-translate), concatenate within each group in x-order, and read lines
-top-to-bottom to reconstruct the clue list text.
+Read `working-files/<date>/svg_text.json` — shape is `{source, nodes:
+[{x, y, text}, ...], flatText}`. `x`/`y` are real page-pixel coordinates
+(same space as `page.jpg`), one entry per glyph/text-run in document
+order. `flatText` is those same nodes already joined in that order — on
+the one issue this was tested against, document order alone reproduced
+clean, correctly-sequenced Across-then-Down clue text with no need to
+group by `y`/reconstruct lines from coordinates. Start from `flatText`;
+fall back to grouping `nodes` by rounded `y` (glyphs on the same printed
+line share a y-value) only if `flatText` looks jumbled or interleaved.
 
 **Read the clue-layout convention in
 `../references/workflow_notes.md` ("Clue-list layout convention") before

@@ -8,80 +8,91 @@ is:
 
     https://issuu.com/charlestoncitypaper
 
-New issues go up on Fridays. Individual issue URLs follow the pattern:
+New issues go up on Fridays. A few issue types deviate from the standard
+weekly, e.g. special guides like "Best of Charleston" or "Piccolo
+Spoleto" guides, or seasonal "Dish Dining Guide" issues — these don't
+reliably have a crossword and `fetch_issue.py`'s doc-slug regex already
+skips them (it only matches slugs shaped like
+`charleston_city_paper_MM_DD_YYYY_-_V.N`).
 
-    https://issuu.com/charlestoncitypaper/docs/YYMMDDfullbookweb
+**Do not construct a doc slug from the date pattern.** An earlier version
+of this doc claimed the pattern was `<YYMMDD>fullbookweb` — that's stale
+and 404s now. Always resolve the real slug from an `<a href>` on the
+listing page (`fetch_issue.py`'s `find_issue()` does this).
 
-e.g. `250110fullbookweb` = issue dated 2025-01-10. (A few issue types
-deviate, e.g. special guides like "Best of Charleston" or "Piccolo
-Spoleto" guides use a different slug — skip those, look for the
-standard weekly issue instead, usually named with just the date.)
+## Automated fetch (primary method)
 
-## Workflow
+`skill/scripts/fetch_issue.py` (see `fetch-issue/SKILL.md`) does the
+whole thing with plain HTTP requests — no `claude-in-chrome`, no visual
+page-hunting. This replaced an earlier browser-driven version of this
+skill; worth understanding *why* each old assumption broke, since it's
+easy to reintroduce the same dead ends if this gets rewritten again:
 
-1. `web_fetch` (or `web_search` if fetch is blocked) the publisher page
-   above to find the newest weekly issue's URL and its date.
-2. Open that issue with `claude-in-chrome` (a plain `web_fetch` of the
-   doc page won't expose page content — Issuu's reader is entirely
-   JS-rendered, and there is no downloadable PDF: check for a download
-   link/button in the page DOM if you want to confirm this for a given
-   publication, but as of this writing Charleston City Paper's issues
-   don't have it enabled).
-3. **Get the document ID.** Once the page has loaded, its `<script>`
-   tags include a JSON-LD block (`@type: "DigitalDocument"`) with an
-   `image` field shaped like
-   `https://image.isu.pub/<doc-id>/jpg/page_1_thumb_large.jpg` — pull
-   `<doc-id>` out of that URL. You'll use it for both of the next two
-   steps.
-4. **Find the crossword page.** The fastest way: navigate the reader
-   iframe (`issuu.com/rd4?p=1&d=<doc-slug>&u=charlestoncitypaper`) and
-   click the grid/thumbnail-view icon in its toolbar — it lays out
-   every page as a thumbnail in one screenshot, and the crossword grid
-   is visually obvious at a glance. Page number drifts week to week
-   with ad placement (page 30 one week, page 23 the next), so don't
-   assume last week's number. Note the page number once you spot it.
-5. **Pull the page image inside the browser, not the sandbox.**
-   `image.isu.pub` isn't on the sandbox's network allowlist, so
-   `bash`/`web_fetch` can't download
-   `image.isu.pub/<doc-id>/jpg/page_<n>.jpg` directly. The browser tab
-   *can* reach it though (no CORS/allowlist issue there) — fetch it via
-   `claude-in-chrome:javascript_tool` and save it to disk as described
-   in `fetch-issue/SKILL.md` Step 2. Grid extraction itself happens
-   later, against the saved file, in `build-puzzle-json/SKILL.md`
-   Step 1 (`scripts/extract_grid.py`) — don't try to run extraction
-   in-browser, there's no need to.
-6. **Get clue text from the page's real SVG text layer, not a
-   screenshot read.** Issuu renders each visible page/spread as an SVG
-   with individually-positioned `<text>` elements (one per glyph or
-   word-fragment) alongside the raster image — this is effectively a
-   perfect, non-OCR transcription straight from the source. Find it
-   with `document.querySelectorAll('svg')` and pick the one with the
-   most `<text>` children (thousands, not a handful) for the page
-   you're on. Each text node's `transform="matrix(...)"` encodes its
-   position; group nodes by their y-translate (rounded — glyphs on the
-   same line share the same y) and concatenate in y-then-document-order
-   to reconstruct lines. This is worth doing even when a screenshot
-   read looks unambiguous, and is essential for confirming anything
-   that looks like a possible duplicate or OCR error — e.g. it caught
-   and *confirmed* (not fixed) a case where two different clue numbers
-   were printed with genuinely identical text in the original, which
-   would have looked exactly as suspicious either way and needed
-   checking against the actual glyph positions rather than assumed to
-   be a misread.
-7. Hand off to `build-puzzle-json/SKILL.md` to turn the saved raw
-   material into `puzzles/<date>.json`.
+- **`image.isu.pub/<doc-id>/jpg/page_<n>.jpg` IS reachable from a plain
+  HTTP client.** An earlier version of this doc claimed the sandbox
+  couldn't reach that host and required routing the fetch through a
+  browser tab's `fetch()`. That was never re-verified and turned out to
+  be wrong — `curl`/`urllib` reach it fine.
+- **`svg.issuu.com/<doc-id>/page_<n>.svg` is strictly better than the
+  `.jpg` endpoint anyway** — one fetch gets you both the full-res raster
+  page (embedded as a `data:image/jpeg;charset=utf-8;base64,...` URI
+  inside an `<image>` element) and the complete vector text layer, so
+  there's no reason to hit the `.jpg` endpoint separately.
+- **Always send a real browser `User-Agent`.** Bare `curl` (`curl/8.7.1`)
+  or Python's default `urllib`/`requests` UA is an obvious bot signature
+  and risks getting blocked — this matters more once fetching runs
+  unattended (e.g. from a GitHub Action) rather than a one-off manual
+  pull. `fetch_issue.py`'s `USER_AGENT` constant is a real Chrome UA
+  string; keep sending it on every request to `issuu.com`, `image.isu.pub`,
+  and `svg.issuu.com`.
+- **Text glyph position is not a `matrix(...)` transform on the `<text>`
+  element.** That was true of an older Issuu rendering approach; the
+  current one positions each text run via
+  `<textPath href="#pN">glyphs</textPath>` inside the `<text>`, where
+  `pN` refers to a sibling `<path id="pN" d="Mx,y L...">` elsewhere in
+  the SVG. The path's own first `M x,y` command is the run's real
+  page-pixel anchor (matches `page.jpg`'s pixel space directly — no unit
+  conversion needed). `fetch_issue.py`'s `parse_page_svg()` does this
+  parse.
+- **Finding the crossword page doesn't need visual judgment either.**
+  The old approach required opening the reader's thumbnail-grid view and
+  eyeballing which page looked like a crossword, because the page number
+  drifts week to week with ad placement. Since the SVG text layer is
+  plain text, scanning each page's SVG for the constructor byline
+  ("Jonesin'") and stopping at the first hit is faster and removes the
+  guesswork — confirmed on a live issue, page 23 was correctly found in
+  under 4 seconds for 5 pages scanned.
 
+## Manual/fallback: finding the page visually
 
+Only needed if the automated scan in `fetch_issue.py` can't find a
+byline match (e.g. a constructor/byline change, or a special issue with
+an unusual layout):
 
-The single best confirmation that the grid was read correctly: run
-`extract_grid.py`, take its auto-numbering summary (count of Across/Down
-entries and the specific numbers used), and compare it against the
-numbers in the clue list you transcribed from the same page. These
-should match exactly — same count, same numbers, 1 through the highest
-clue number with no gaps. If they don't match, first suspect the clue
-transcription (easy to mis-read a number in small print) before
-suspecting the grid extraction (which is a direct pixel measurement and
-has been reliable).
+1. Open the issue with `claude-in-chrome` (a plain fetch of the doc page
+   won't expose page content in the same way the reader does — Issuu's
+   reader is JS-rendered on top of the static page).
+2. Navigate the reader (`issuu.com/charlestoncitypaper/docs/<slug>`) and
+   click the grid/thumbnail-view icon in its toolbar — it lays out every
+   page as a thumbnail in one screenshot, and the crossword grid is
+   visually obvious at a glance. Note the page number.
+3. Once you have the page number, you can go back to
+   `fetch_issue.py`'s underlying functions (`get_doc_id`,
+   `parse_page_svg`) rather than redoing the browser-based extraction —
+   the only thing the browser was needed for here was picking the page
+   number.
+
+## Last week's solution grid
+
+Every issue prints the previous week's completed grid as a small answer
+key, positioned near a rotated "Last Week's Solution" sidebar label.
+`fetch_issue.py` locates that label in the parsed text-node list and
+crops a generous region around it — the crop bounds are a heuristic
+(anchor off the label's x position, assume the grid roughly fills the
+bottom-right corner of the page) and have only been visually verified on
+one issue so far. Confirm the crop visually before relying on it,
+especially for the first few weeks this runs — layout could plausibly
+shift issue to issue.
 
 ## Clue-list layout convention (read this before transcribing)
 
@@ -106,5 +117,22 @@ same column before it — don't assume everything above the visible
 "Down" heading is Across without checking each clue number against the
 grid's own numbering). Then continue the Down list into the right
 column. Cross-check every clue number against the grid's auto-numbering
-output (see above) rather than assuming column position implies
-direction.
+output (see `build-puzzle-json/SKILL.md` Step 3) rather than assuming
+column position implies direction.
+
+Note: on the one issue checked so far, `svg_text.json`'s `flatText` (DOM
+document order) already reproduced the Across-then-Down sequence
+correctly without needing position-based line reconstruction — the
+column-break hazard above is about *visual* column position, not about
+DOM order, so don't assume flatText is always safe unread; still
+cross-check numbering per Step 3.
+
+The single best confirmation that the grid was read correctly: run
+`extract_grid.py`, take its auto-numbering summary (count of Across/Down
+entries and the specific numbers used), and compare it against the
+numbers in the clue list you transcribed from the same page. These
+should match exactly — same count, same numbers, 1 through the highest
+clue number with no gaps. If they don't match, first suspect the clue
+transcription (easy to mis-read a number in small print) before
+suspecting the grid extraction (which is a direct pixel measurement and
+has been reliable).

@@ -239,6 +239,18 @@ def main():
                 f"the puzzle from {prior_date})",
                 file=sys.stderr,
             )
+
+            # Record where this crop came from, merged into the *prior* week's
+            # own meta.json (which already exists if that week was fetched
+            # normally) so a later build step can link players back to the
+            # actual source page instead of just asserting "official". Merge,
+            # don't overwrite -- that file may already carry hand-filled
+            # puzzleTitle/byline/constructor from Step 2 of that earlier run.
+            prior_meta_path = prior_dir / "meta.json"
+            prior_meta = json.loads(prior_meta_path.read_text()) if prior_meta_path.exists() else {}
+            prior_meta["officialSolutionUrl"] = doc_url
+            prior_meta["officialSolutionPage"] = page_num
+            prior_meta_path.write_text(json.dumps(prior_meta, indent=2))
         else:
             print("no 'Last Week's Solution' label found on this page; skipped crop", file=sys.stderr)
 

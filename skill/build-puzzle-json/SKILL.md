@@ -72,6 +72,8 @@ shape directly):
   "subtitle": "<byline from meta.json>",
   "solutionSalt": "ccpxwd-<year>-ref-solve",
   "solutionHashesFile": "puzzles/<date>.solution-hashes.txt",
+  "solutionSource": "<optional: 'official' if solutionHashesFile was transcribed from the printed answer key in a later issue; omit/'reference' for a submitted solve>",
+  "officialSolutionUrl": "<optional: only set alongside solutionSource:'official' -- from meta.json's officialSolutionUrl, the later issue's viewer URL where the printed grid appears>",
   "pattern": [ /* 15 rows from Step 1 */ ],
   "across": [ /* [number, "clue text"] from Step 2 */ ],
   "down": [ /* [number, "clue text"] from Step 2 */ ]
@@ -86,6 +88,19 @@ strings, not HTML entities — `index.html` writes these fields via
 just shows "Grid complete" with no match/mismatch comparison until
 someone solves the puzzle via the site's `?admin=1` panel and generates
 that file. That's a separate, later step, not part of this skill.
+
+**Upgrading a puzzle to `solutionSource: "official"`** (once a later
+issue has printed that puzzle's answer key — see
+`working-files/<date>/printed_solution_grid_CANDIDATE.jpg` and that
+week's `meta.json` `officialSolutionUrl`/`officialSolutionPage`,
+produced by `fetch_issue.py` when it processes the *following* week):
+solve this puzzle's grid in `?admin=1` by reading off the printed crop
+image (not by playing it), generate the hashes file as usual, then set
+`"solutionSource": "official"` and `"officialSolutionUrl"` (from that
+meta.json) on this puzzle's already-published JSON. Same hash-compare
+mechanism as a reference solve — only the completion-badge wording
+changes. Confirm the crop's bounds visually first; it's an unverified
+heuristic per `../references/workflow_notes.md`.
 
 ## Step 5 — Add it to puzzles/index.json
 

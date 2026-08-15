@@ -41,7 +41,11 @@ It:
    week's page always includes it) into
    `working-files/<the-prior-week's-date>/printed_solution_grid_CANDIDATE.jpg`
    — unverified bounds, confirm visually before trusting it for
-   anything. See "Last week's solution grid" below.
+   anything. Also merges `officialSolutionUrl` (this issue's doc URL) and
+   `officialSolutionPage` (this issue's crossword page number — the
+   solution grid sits on that same page) into the *prior* week's
+   `meta.json`, so a source link can be shown to players later. See "Last
+   week's solution grid" below.
 
 If the script's page-discovery scan fails (crossword byline text
 doesn't match, e.g. a special guide issue with a different or no

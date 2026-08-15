@@ -386,7 +386,7 @@
 <div id="app">
   <div id="leftCol">
     <div id="gridWrap"><div id="grid"></div></div>
-    <span id="completionStatus" class="status-badge"></span>
+    <span id="completionStatus" class="status-badge"><span id="completionStatusText"></span><a id="completionSourceLink" href="#" target="_blank" rel="noopener" style="display:none; margin-left:8px; color:inherit;">(source)</a></span>
   </div>
   <div id="cluesPanel">
     <button id="hamburgerBtn" aria-label="Tools">&#9776;</button>
@@ -405,7 +405,7 @@
      the full width under grid+clues instead of just the grid column. -->
 <div id="focusBadgeRow"></div>
 
-<footer>Remembers your progress in this browser. When the grid's fully filled, we'll tell you if your solve matches our reference solve.</footer>
+<footer>Remembers your progress in this browser. When the grid's fully filled, we'll tell you if your solve matches <span id="footerSolveNote">our reference solve</span>.</footer>
 
 <!-- Admin-only: generates a pasteable solution-hashes.txt from whatever grid you've
      solved in the normal UI above. Hidden unless the page is loaded with
@@ -448,7 +448,7 @@ const SIZE = 15;
 // and fills these in before the grid is built. This also fixes the old bug
 // where the <title>/header stayed stuck on whichever puzzle was last
 // hand-edited into this file.
-let pattern, ACROSS, DOWN, SOLUTION_SALT, SOLUTION_HASHES_FILE, PUZZLE_ID;
+let pattern, ACROSS, DOWN, SOLUTION_SALT, SOLUTION_HASHES_FILE, PUZZLE_ID, SOLUTION_SOURCE, SOLUTION_SOURCE_URL;
 
 async function loadPuzzleData(){
   // GitHub Pages has no server-side routing: a direct hit on /archive/<id>
@@ -479,11 +479,23 @@ async function loadPuzzleData(){
   SOLUTION_SALT = data.solutionSalt;
   SOLUTION_HASHES_FILE = data.solutionHashesFile;
   PUZZLE_ID = data.id;
+  // "reference" (default) = someone's submitted solve, not authoritative.
+  // "official" = transcribed from the answer key printed in a later issue.
+  // Only changes the completion wording below -- same hash-compare mechanism either way.
+  SOLUTION_SOURCE = data.solutionSource || 'reference';
+  // Deep link to the later issue's viewer page where the printed answer key
+  // appears -- lets a player verify the "official" claim against the actual
+  // source instead of just trusting the badge. Only meaningful/shown when
+  // SOLUTION_SOURCE is 'official'.
+  SOLUTION_SOURCE_URL = data.officialSolutionUrl || null;
 
   document.title = data.title + ' \u2014 Charleston City Paper Crossword';
   document.getElementById('kickerDate').textContent = data.kickerDate;
   document.getElementById('puzzleTitle').textContent = data.title;
   document.getElementById('puzzleSub').textContent = data.subtitle;
+  document.getElementById('footerSolveNote').textContent = SOLUTION_SOURCE === 'official'
+    ? 'the official answer key from a later issue'
+    : 'our reference solve';
 }
 
 // Optional reference solve for match/mismatch comparison -- NOT an official
@@ -695,18 +707,21 @@ let completionStatusToken = 0;
 async function updateCompletionStatus(){
   const full = isGridFull();
   const badge = document.getElementById('completionStatus');
+  const badgeText = document.getElementById('completionStatusText');
+  const sourceLink = document.getElementById('completionSourceLink');
   badge.classList.remove('match','mismatch');
+  sourceLink.style.display = 'none';
 
   if(!full){
     badge.classList.remove('show');
-    badge.textContent = '';
+    badgeText.textContent = '';
     sizeFocusMode();
     return;
   }
   badge.classList.add('show');
 
   if(!SOLUTION_HASHES){
-    badge.textContent = 'Grid complete';
+    badgeText.textContent = 'Grid complete';
     sizeFocusMode();
     return;
   }
@@ -728,12 +743,21 @@ async function updateCompletionStatus(){
     if(hash !== SOLUTION_HASHES[num+'D']) mismatches++;
   }
   if(token !== completionStatusToken) return;
+  const isOfficial = SOLUTION_SOURCE === 'official';
   if(mismatches===0){
-    badge.textContent = 'Well done! Your answers match what we think is the complete correct puzzle solve. Check next week’s paper for official answers!';
+    badgeText.textContent = isOfficial
+      ? 'Well done! Your answers match the official answer key from a later issue.'
+      : 'Well done! Your answers match what we think is the complete correct puzzle solve. Check next week’s paper for official answers!';
     badge.classList.add('match');
   } else {
-    badge.textContent = `Complete — our solve is a little different, in ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
+    badgeText.textContent = isOfficial
+      ? `Complete — differs from the official answer key in ${mismatches} answer${mismatches===1?'':'s'}.`
+      : `Complete — our solve is a little different, in ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
     badge.classList.add('mismatch');
+  }
+  if(isOfficial && SOLUTION_SOURCE_URL){
+    sourceLink.href = SOLUTION_SOURCE_URL;
+    sourceLink.style.display = '';
   }
   sizeFocusMode();
 }

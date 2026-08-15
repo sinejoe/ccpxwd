@@ -60,7 +60,7 @@ shape directly):
 
 ```json
 {
-  "id": "ccp-<date>-<short-slug-from-title>",
+  "id": "<date as YYYYMMDD, e.g. 2026-08-14 -> 20260814>",
   "date": "<date>",
   "kicker": "Charleston City Paper · <MM.DD.YYYY>",
   "title": "<puzzleTitle from meta.json>",

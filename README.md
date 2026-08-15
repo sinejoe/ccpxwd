@@ -33,6 +33,11 @@ that week's puzzle.
   puzzle: `skill/fetch-issue/` finds the current issue on Issuu and
   saves the raw page image/text layer; `skill/build-puzzle-json/`
   parses that into a new `puzzles/<date>.json` entry.
+- `404.html` — GitHub Pages has no server-side routing, so a direct
+  hit on a pretty URL like `/archive/20260814` 404s. This bounces to
+  `/` with the original path preserved in `?redirect=`; `index.html`
+  restores it via `history.replaceState` and routes to that puzzle.
+  `?puzzle=<id>` still works too as a plain query-string alternative.
 - `_config.yml` — Jekyll config for GitHub Pages; excludes non-app
   files (docs, `skill/`, working files) from the published site.
 - `docker-compose.yml` — local Jekyll container for testing the

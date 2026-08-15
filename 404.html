@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Charleston City Paper Crossword</title>
+</head>
+<body>
+<script>
+// GitHub Pages has no server-side routing -- a direct hit on a pretty URL
+// like /archive/20260807 has no matching file, so GitHub Pages serves this
+// 404 instead. Bounce to the real app at "/", preserving the original
+// path+query in ?redirect= so index.html can restore it via replaceState
+// and route to the right puzzle.
+location.replace('/?redirect=' + encodeURIComponent(location.pathname + location.search));
+</script>
+</body>
+</html>

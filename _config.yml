@@ -6,10 +6,9 @@
 # actual app (index.html, puzzles/).
 exclude:
   - CLAUDE.md
-  - HANDOFF.md
   - README.md
-  - START_HERE_PROMPT.md
   - _config.yml
   - .gitignore
+  - docker-compose.yml
   - working-files/
   - skill/

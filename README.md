@@ -6,7 +6,7 @@ Matt Jones).
 
 ## Play it
 
-Open `crossword_standalone.html` directly in a browser — it's a
+Open `index.html` directly in a browser — it's a
 single, dependency-free HTML file (no build step, no external
 requests). Progress autosaves to `localStorage`; a status badge shows
 whether a finished grid matches the reference solve, when one has
@@ -14,7 +14,7 @@ been set for that week's puzzle.
 
 ## Contents
 
-- `crossword_standalone.html` — the file to publish. Grid, clues,
+- `index.html` — the file to publish. Grid, clues,
   typing/keyboard nav, autosave, completion badge. No admin/debug
   tools.
 - `working-files/crossword_0814_full_toolset.html` — a fuller
@@ -29,4 +29,5 @@ been set for that week's puzzle.
 
 ## Status
 
-Not yet deployed to a live URL. See `HANDOFF.md` for open items.
+Live at https://sinejoe.github.io/ccpxwd/. See `HANDOFF.md` for open
+items.

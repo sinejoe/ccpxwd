@@ -16,7 +16,7 @@ fixed in the original session — the comments in the code explain the
 
 ## Folder contents
 
-- `crossword_standalone.html` — **the file to actually publish.**
+- `index.html` — **the file to actually publish.**
   Stripped down for a public end-user: grid, clues, typing, keyboard
   nav, autosave via `localStorage`, and a completion badge that
   compares against an embedded reference solve if one's been set. No
@@ -40,7 +40,7 @@ fixed in the original session — the comments in the code explain the
 ## Both HTML files are single-file, dependency-free
 
 No build step, no external CDN/font/script requests, no
-`window.storage` dependency in `crossword_standalone.html` (that was
+`window.storage` dependency in `index.html` (that was
 Claude's artifact-only storage API — deliberately removed in favor of
 plain `localStorage`, since there's no server here and a cookie would
 be the wrong tool: this is pure client-side persistence with no HTTP
@@ -142,13 +142,38 @@ deviate:**
   favor of a quiet status badge, because repeatedly clearing/refilling
   cells while double-checking kept re-triggering it.
 
-There's no in-app way to set `SOLUTION` in the current build (that was
-an intentional design choice — see "Feature history" above: no
-server, so it has to be baked into the file at build/publish time by
-whoever's maintaining it, not entered at runtime by an end user). If
-Claude Code wants to add a real way to submit a solve going forward,
-worth discussing with the person first rather than assuming — the
-export/import removal above was deliberate, not an oversight.
+`SOLUTION` still has to be baked into the file at build/publish time
+and redeployed — there's no server, so nothing can write to it at
+runtime for real. What *does* exist now (added Aug 2026, after
+explicit discussion) is an admin-only helper that generates the
+paste-ready `SOLUTION` block from whatever grid you've solved in the
+normal UI, so you don't have to hand-transpose 15×15 letters:
+
+- Load the page with `?admin=1` in the URL — this reveals a
+  passphrase-gated panel (hidden from normal players; the panel
+  itself is inert without the passphrase). The SHA-256 hash of the
+  passphrase lives in the script as `ADMIN_HASH`; the passphrase
+  itself isn't stored anywhere in the repo, only given to the person
+  who set it up.
+- This is explicitly **not** real security — it's a deterrent against
+  casual snooping, not a determined attacker (the hash is visible in
+  page source and could be brute-forced offline). Accepted tradeoff:
+  the thing being gated is "who can suggest a reference solve", not
+  sensitive data, and real GitHub-OAuth-backed auth would require
+  moving off static GitHub Pages onto something with a backend, which
+  was explicitly ruled out in favor of staying dependency-free.
+- Once unlocked, solve the puzzle in the actual grid (same UI
+  everyone else uses), then click "Generate SOLUTION block from my
+  grid" — it reads the live `grid` state, not a separate code/import
+  step, so it can't drift out of sync with whatever puzzle is
+  currently loaded. Paste the output over the existing
+  `const SOLUTION = [...]` and redeploy.
+- This intentionally does **not** revive the old base64
+  export/import ("progress code") flow from
+  `working-files/crossword_0814_full_toolset.html` — going straight
+  from live grid to paste-ready block skips a decode step. That
+  mechanism is still there in the full-toolset build if ever needed
+  for a different purpose.
 
 ## UI/UX details worth preserving (each fixed a reported bug)
 
@@ -223,8 +248,8 @@ catch more, faster, and CSS assertions will actually be trustworthy.
 
 ## Known open items / things not yet done
 
-- No real hosting has happened yet — `crossword_standalone.html` has
-  never been deployed to an actual URL, only tested locally.
+- Deployed to GitHub Pages at https://sinejoe.github.io/ccpxwd/ as of
+  Aug 2026. Every push to `main` auto-redeploys.
 - No mechanism exists yet for updating `SOLUTION` after initial
   publish other than manually editing the file and redeploying.
 - The skill's weekly-build workflow has only been exercised for two

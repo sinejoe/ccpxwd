@@ -20,6 +20,13 @@ of this doc claimed the pattern was `<YYMMDD>fullbookweb` — that's stale
 and 404s now. Always resolve the real slug from an `<a href>` on the
 listing page (`fetch_issue.py`'s `find_issue()` does this).
 
+The trailing `_-_30.2`/`_-_30.3` etc. on the slug is **not** a page
+number (easy to assume it is) — it's some kind of edition/version tag on
+the issue itself. To deep-link the Issuu viewer to a specific page/spread,
+append `/<page>` to the full doc URL, e.g.
+`.../charleston_city_paper_08_14_2026_-_30.3/23` opens page 22/23's
+spread directly. `fetch_issue.py` uses this for `officialSolutionUrl`.
+
 ## Automated fetch (primary method)
 
 `skill/scripts/fetch_issue.py` (see `fetch-issue/SKILL.md`) does the

@@ -248,7 +248,11 @@ def main():
             # puzzleTitle/byline/constructor from Step 2 of that earlier run.
             prior_meta_path = prior_dir / "meta.json"
             prior_meta = json.loads(prior_meta_path.read_text()) if prior_meta_path.exists() else {}
-            prior_meta["officialSolutionUrl"] = doc_url
+            # Trailing /<page> deep-links the Issuu viewer straight to that page's
+            # spread -- the doc_url on its own just opens the issue at page 1.
+            # (The doc slug's own "_-_30.3" suffix looked like it might encode a
+            # page/version number but doesn't; this /<n> suffix is the real thing.)
+            prior_meta["officialSolutionUrl"] = f"{doc_url}/{page_num}"
             prior_meta["officialSolutionPage"] = page_num
             prior_meta_path.write_text(json.dumps(prior_meta, indent=2))
         else:

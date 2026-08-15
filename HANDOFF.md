@@ -252,6 +252,28 @@ the normal UI, so you don't have to hand-hash 78+ answers yourself:
   stay above the dropdown panel in stacking order (`z-index`) or
   there's no way to click it again to close the menu — this broke
   once already.
+- **The completion badge (`#completionStatus`) is a single DOM element
+  that gets moved, not duplicated**, between `#leftCol` (normal mode,
+  below the grid) and `#focusBadgeRow` (focus mode, a full-width row
+  spanning under grid+clues) via `appendChild()` in the focus/exit
+  click handlers. In focus mode the badge pushes *both* the grid and
+  clues up, not just the grid column — that's why it lives in its own
+  full-width sibling row after `#app`, not inside `#leftCol`.
+  `sizeFocusMode()` measures `#focusBadgeRow`'s actual `offsetHeight`
+  (not a guessed constant) so `#app` shrinks by exactly the right
+  amount and the badge never lands below the fold; it's re-run
+  whenever the badge's own height can change (i.e. from inside
+  `updateCompletionStatus()`), since a longer "N mismatched" message
+  wraps to more lines than "Grid complete".
+- **The "Restored your progress from last time" banner was removed
+  entirely** (not just hidden) — if old answers reappear in the grid
+  on load, that's self-evidently "you remembered them"; a banner
+  saying so was redundant. Don't re-add `#banner`/`showBanner()`.
+- **Esc exits focus mode**, matching the standard convention for
+  fullscreen-ish views. Wired as a `document`-level `keydown` listener
+  that calls the same exit button's `click()` handler, so it stays in
+  sync with the mouse-driven exit path rather than duplicating its
+  logic.
 
 ## Testing approach used so far
 

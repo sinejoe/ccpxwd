@@ -1,0 +1,15 @@
+# GitHub Pages (legacy Jekyll build) serves every tracked file in the repo
+# by default -- there's no per-file publish list otherwise. This exclude
+# list is that list: everything below stays in the repo/git history but
+# gets no public ccpx.fyi URL. Keep it in sync if new top-level repo/skill
+# docs get added -- default to excluding anything that isn't part of the
+# actual app (index.html, puzzles/).
+exclude:
+  - CLAUDE.md
+  - HANDOFF.md
+  - README.md
+  - START_HERE_PROMPT.md
+  - _config.yml
+  - .gitignore
+  - working-files/
+  - skill/

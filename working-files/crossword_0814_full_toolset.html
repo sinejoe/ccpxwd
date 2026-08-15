@@ -1120,10 +1120,11 @@ let saveTimer = null;
 let lastSavedSnapshot = null;
 let saveErrorLogged = false;
 
-// Works two ways: window.storage (Claude's artifact storage API, when this
-// runs inside a Claude artifact) or localStorage (a normal browser, when
-// this is hosted standalone -- GitHub Pages, Netlify, opened as a plain
-// file, whatever). Same file, same behavior, whichever context it's in.
+// Works two ways: window.storage (a hosted-artifact storage API, when this
+// runs inside that kind of embedded viewer) or localStorage (a normal
+// browser, when this is hosted standalone -- GitHub Pages, Netlify, opened
+// as a plain file, whatever). Same file, same behavior, whichever context
+// it's in.
 const storageAdapter = {
   async get(key){
     if(window.storage && typeof window.storage.get === 'function'){

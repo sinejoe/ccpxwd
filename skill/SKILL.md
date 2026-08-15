@@ -1,151 +1,49 @@
 ---
 name: charleston-citypaper-crossword
-description: Build a playable, interactive browser crossword from the Charleston City Paper's weekly print crossword puzzle. Use this whenever the user asks for "this week's crossword", "the new Charleston City Paper puzzle", asks you to check/find/fetch/grab the latest issue's crossword, mentions reusing "the crossword template" for a new puzzle, or uploads a photo/screenshot of a Charleston City Paper crossword page. Covers finding the current issue on Issuu, locating the crossword page, extracting the grid layout via pixel analysis (not a visual guess), transcribing the clues, and producing the interactive HTML artifact with autosave and NYT-style keyboard navigation.
+description: Router for the Charleston City Paper weekly crossword pipeline. Use this to figure out which of the two sub-skills applies -- charleston-citypaper-fetch-issue (find the week's issue/crossword page on Issuu, save the raw page image + SVG text layer) or charleston-citypaper-build-puzzle-json (parse already-fetched raw material into puzzles/<date>.json). If the user's intent is already clear ("find this week's crossword" vs. "build the JSON from what we fetched"), invoke that sub-skill directly instead of this one.
 ---
 
-# Charleston City Paper Crossword Builder
+# Charleston City Paper Crossword — weekly pipeline
 
-Turns a photo (or a freshly-fetched issue page) of the Charleston City
-Paper's weekly crossword into a fully playable browser artifact: 15x15
-(or whatever size the actual puzzle is) grid on the left, Across/Down
-clues in two columns on the right, arrow-key navigation, click-to-select
-clues, and autosaving progress via the artifact's persistent storage.
+Turning a new week's print crossword into a playable entry in this repo
+is a two-step pipeline, split into two sub-skills so the fragile,
+judgment-heavy step (finding the right page on Issuu) and the
+deterministic step (parsing it into JSON) can be run and re-run
+independently:
 
-## When the user already has an image
+1. **`fetch-issue/SKILL.md`** — locates the current (or a specified)
+   week's issue on Issuu, finds the crossword page inside it, and saves
+   the raw page image + SVG text layer to `working-files/<date>/`. This
+   is the part that needs a live browser (`claude-in-chrome`) and human
+   judgment about which page is actually the crossword.
+2. **`build-puzzle-json/SKILL.md`** — takes that `working-files/<date>/`
+   directory and turns it into `puzzles/<date>.json` (grid pattern,
+   clues, header text) plus a new entry in `puzzles/index.json`. Pure
+   parsing, no network access, safe to re-run as many times as needed
+   while fixing a transcription error.
 
-If a puzzle photo/screenshot is already uploaded, skip straight to
-**Step 2**.
+If the user already has a puzzle photo/screenshot instead of wanting a
+fresh Issuu fetch, skip step 1: save the image directly to
+`working-files/<date>/page.jpg`, get clue text by reading the image
+yourself (there's no SVG text layer for an uploaded photo, so
+`svg_text.json` won't exist — transcribe carefully and lean harder on
+the auto-numbering cross-check in step 2), write a minimal
+`working-files/<date>/meta.json` (date, title, byline), then go straight
+to `build-puzzle-json`.
 
-## Step 1 — Find the current issue and crossword page
-
-If the user wants "this week's" puzzle rather than a specific upload,
-see `references/workflow_notes.md` for the Issuu URL pattern, how to
-locate the newest issue, and where the crossword page tends to sit
-within it. Fetch/screenshot that page as an image before continuing.
-
-This part is genuinely variable week to week (page numbers shift,
-Issuu's rendering can change) — don't guess at a page image URL from
-memory; verify it against what's actually on the page each time.
-
-## Step 2 — Extract the grid with pixel analysis, not by eye
-
-Do NOT hand-transcribe the black/white square layout by looking at the
-image — it's easy to get subtly wrong in a way that looks plausible but
-throws off every clue number after the mistake. Instead:
-
-```
-python3 scripts/extract_grid.py <path-to-puzzle-image>
-```
-
-This measures actual pixel brightness per cell rather than guessing, and
-prints:
-- the detected pattern (`.`/`#` per row)
-- an auto-numbering summary: how many Across/Down entries it implies,
-  and their exact numbers
-
-If the page has other dark content near the grid (a solution grid,
-photos, dense text) that confuses line detection, pass a rough crop:
-
-```
-python3 scripts/extract_grid.py <image> --crop x0,y0,x1,y1
-```
-
-(Eyeball the crop box from the image — doesn't need to be pixel-exact,
-the script finds the precise grid lines within it.)
-
-**Verify before moving on:** compare the script's Across/Down numbers
-against the clue numbers you can see printed on the page. They should
-match exactly, 1 through the highest number, no gaps. If they don't,
-re-crop and re-run rather than proceeding with a mismatch — see
-`references/workflow_notes.md` for troubleshooting.
-
-## Step 3 — Transcribe the clues
-
-Read the Across and Down clue lists directly from the image/page and
-transcribe them verbatim (typos in a clue are far more noticeable to the
-user than a grid issue would be, so take care here). Keep the exact
-clue numbers as printed.
-
-**Read `references/workflow_notes.md`'s clue-layout section before
-transcribing** — this puzzle's two printed text columns do NOT align
-with the Across/Down split (the Down list starts partway down the left
-column and continues into the right column), which has caused real
-transcription errors before. Verify each clue's direction against the
-grid's own auto-numbering rather than assuming column position implies
-direction.
-
-## Step 4 — Fill in the template
-
-Copy `assets/crossword_template.html` and edit these pieces (each is
-clearly marked with a comment in the file):
-
-- Header: kicker (publication + date), title, subtitle
-- `pattern` array: the `.`/`#` rows from Step 2
-- `ACROSS` / `DOWN` arrays: `[number, "clue text"]` pairs from Step 3
-- `PUZZLE_ID`: a unique string for this puzzle (e.g.
-  `ccp-YYYY-MM-DD-slug`) — this keys the autosave storage, so each
-  week's puzzle needs its own ID or progress from a prior week will
-  bleed into the new one
-
-Everything else (grid rendering, numbering, keyboard navigation,
-autosave, clue-click highlighting) is generic and shouldn't need
-changes.
-
-## Step 5 — Test before presenting
-
-Before handing the file to the user, sanity-check it actually runs:
-
-```bash
-python3 -c "
-import re
-html = open('PATH_TO_FILE.html').read()
-open('/tmp/_check.js','w').write(re.search(r'<script>(.*)</script>', html, re.S).group(1))
-"
-node --check /tmp/_check.js
-```
-
-A `node --check` pass only catches syntax errors — it will NOT catch a
-`const`/`let` name colliding with a browser global (e.g. `top`, `name`,
-`location`, `history`, `status`, `event`, `frames`), which produces a
-silent syntax error only inside an actual browser/DOM context. If
-you've renamed anything in the template, run it through jsdom too:
-
-```bash
-pip install jsdom --break-system-packages -q   # (jsdom is actually an npm package)
-npm install jsdom --silent
-node -e "
-const { JSDOM } = require('jsdom');
-const fs = require('fs');
-const html = fs.readFileSync('PATH_TO_FILE.html','utf8');
-const dom = new JSDOM(html, { runScripts: 'dangerously', resources: 'usable' });
-dom.window.onerror = (m,s,l) => console.log('ERROR', m, 'line', l);
-setTimeout(()=> console.log('grid cells:', dom.window.document.getElementById('grid').children.length), 300);
-"
-```
-`grid cells: 225` (or N*N for the actual grid size) confirms it rendered
-without error.
-
-## Step 6 — Save to outputs and present
-
-Save to `/mnt/user-data/outputs/`, then use `present_files`. Mention
-that progress autosaves per-puzzle (keyed by `PUZZLE_ID`), so closing
-and reopening won't lose their work, and that a new week's puzzle
-starts with a blank grid since it's a different `PUZZLE_ID`.
+`index.html` itself is a static shell that fetches whatever
+`puzzles/index.json` points to — a routine new week never requires
+editing `index.html`. See the repo's `HANDOFF.md` ("How the puzzle data
+is structured") for the full schema and rationale.
 
 ## Optional: baking in a reference solve
 
-The template has a `const SOLUTION = null;` near the top of the
-script. If the user later hands over a "progress code" (the same
-base64 string their own "Copy progress code" button produces) after
-finishing the puzzle themselves, decode it and populate `SOLUTION`
-with the resulting row strings, then rebuild and republish. Once set,
-the completion status automatically starts comparing the solver's
-grid against it and reports a match/mismatch count.
-
-This is explicitly NOT an official answer key — it's just whatever
-solve that person chose to submit — so the UI language is deliberately
-soft ("differs from our reference solve in N spots", never "wrong" or
-"error"), and no individual cells get flagged. Keep any future
-comparison feature honoring that same framing: informational, not a
-grading experience. Only do this when the user explicitly provides a
-solve; never fabricate or guess one.
+This is a separate, later, on-site step — not part of either sub-skill
+above. Once a puzzle is published, load the live page with `?admin=1`,
+enter the passphrase, solve the puzzle in the normal grid, and use the
+"Generate solution-hashes file from my grid" button to produce that
+puzzle's `solutionHashesFile` contents. See `HANDOFF.md`'s "Reference
+solve" section for the full threat model and the framing rules that
+apply to any match/mismatch UI (never call anything "wrong", never flag
+individual cells, always make clear it's *a* submitted solve, not an
+official answer key).

@@ -18,11 +18,16 @@ tools — serve the directory locally instead, e.g.
 
 ## Building a new week's puzzle
 
-Use `skill/SKILL.md` — pixel-measure the grid from the source image,
-auto-number it, and cross-check the count/numbering against the
-puzzle's printed clue numbers before trusting a transcription. Don't
-hand-transcribe the grid or assume a clue's Across/Down direction from
-its printed column position — both have caused real shipped bugs.
+Start at `skill/SKILL.md` — it routes to the two sub-skills:
+`skill/fetch-issue/SKILL.md` (find the issue/crossword page on Issuu,
+save the raw page image + SVG text layer to `working-files/<date>/`)
+and `skill/build-puzzle-json/SKILL.md` (parse that raw material into
+`puzzles/<date>.json` + `puzzles/index.json`). Pixel-measure the grid
+from the source image, auto-number it, and cross-check the
+count/numbering against the puzzle's printed clue numbers before
+trusting a transcription. Don't hand-transcribe the grid or assume a
+clue's Across/Down direction from its printed column position — both
+have caused real shipped bugs.
 
 ## `SOLUTION` / reference-solve framing
 

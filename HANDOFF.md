@@ -338,6 +338,16 @@ catch more, faster, and CSS assertions will actually be trustworthy.
 - Deployed to GitHub Pages at https://sinejoe.github.io/ccpxwd/ (custom
   domain https://ccpx.fyi) as of Aug 2026. Every push to `main`
   auto-redeploys.
+- **GitHub Pages serves every tracked file in the repo by default** —
+  there's no per-file publish list, `index.html` is just what `/`
+  happens to resolve to. `_config.yml`'s `exclude:` list (added Aug
+  2026, after noticing repo docs and legacy build files were reachable
+  at their own public URL) is what actually keeps `CLAUDE.md`,
+  `HANDOFF.md`, `README.md`, `START_HERE_PROMPT.md`, `skill/`, and
+  `working-files/` from getting a live `ccpx.fyi/<path>` URL. Keep it
+  in sync if a new top-level repo/skill doc gets added — default to
+  excluding anything that isn't part of the actual app
+  (`index.html`, `puzzles/`, `CNAME`).
 - No mechanism exists yet for updating a puzzle's reference solve
   after initial publish other than using the admin panel and
   redeploying.
@@ -351,10 +361,15 @@ catch more, faster, and CSS assertions will actually be trustworthy.
   the data layer supports a picker, but no UI exposes it yet. Adding
   one is mostly a small dropdown/list in the hamburger menu that reads
   `puzzles/index.json` and links to `?puzzle=<id>`.
-- **Weekly Issuu fetch is still a manual/chat-driven workflow**
-  (`skill/references/workflow_notes.md`), not automated in this repo.
-  It relies on `claude-in-chrome` to render Issuu's JS-only reader and
-  read its SVG text layer — none of that runs in a plain script yet.
+- **Weekly Issuu fetch is still a manual/chat-driven workflow**, not
+  automated in this repo. It's split into two sub-skills as of Aug
+  2026 — `skill/fetch-issue/SKILL.md` (find the issue/page, save raw
+  material to `working-files/<date>/`) and
+  `skill/build-puzzle-json/SKILL.md` (parse that into
+  `puzzles/<date>.json`) — specifically so a future automation only has
+  to replace the first half. It relies on `claude-in-chrome` to render
+  Issuu's JS-only reader and read its SVG text layer — none of that
+  runs in a plain script yet.
   A real automation (e.g. a scheduled GitHub Action) would need its
   own approach for finding the crossword page and getting clue text
   without a browser-rendered SVG text layer (OCR, or an Issuu API

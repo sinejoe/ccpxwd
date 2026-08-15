@@ -49,15 +49,55 @@ expected.
 
 ## How the puzzle data is structured (read before editing)
 
-Near the top of the `<script>`:
+**As of Aug 2026, `index.html` is a static shell — it has no puzzle data
+hardcoded in it.** On load it fetches `puzzles/index.json` (an array of
+`{id, date, title, file}`, newest first) and then fetches that entry's
+`file` (a per-week JSON, e.g. `puzzles/2026-08-14.json`) via
+`loadPuzzleData()`, near the top of the `<script>`. This replaced an
+earlier design where every new week meant hand-editing constants inside
+`index.html` itself — which is also what caused a real bug (the
+`<title>`/header staying stuck on whichever puzzle was last pasted in).
+
+A puzzle JSON file (`puzzles/YYYY-MM-DD.json`) has:
+- `id` — becomes `PUZZLE_ID`, the string that scopes the localStorage
+  key. Must be unique per puzzle (date-based slug) or two different
+  puzzles will clobber each other's saved progress.
+- `date`, `kicker`, `title`, `subtitle` — header text, written directly
+  into the DOM via `textContent` (not `innerHTML`), so use real unicode
+  punctuation (curly quotes, em dash) in the JSON rather than HTML
+  entities.
 - `pattern` — 15 strings of 15 chars, `.` = white, `#` = black.
-- `ACROSS` / `DOWN` — arrays of `[number, "clue text"]`.
-- `SOLUTION` — either `null`, or the same row-string format as
-  `pattern` but with actual letters instead of `.`, used for the
-  match/mismatch completion badge. See "Reference solve" below.
-- `PUZZLE_ID` — a string that scopes the localStorage key. Must be
-  unique per puzzle (date-based slug) or two different puzzles will
-  clobber each other's saved progress.
+- `across` / `down` — arrays of `[number, "clue text"]`.
+- `solutionSalt` — this puzzle's `SOLUTION_SALT` (see "Reference
+  solve" below).
+- `solutionHashesFile` — path to this puzzle's hashes file, e.g.
+  `puzzles/2026-08-14.solution-hashes.txt`.
+
+`puzzles/index.json` is what makes "load a specific past week" possible
+— `index.html?puzzle=<id>` looks up that id in the index and loads its
+file instead of defaulting to entry `[0]` (the newest). No UI exposes
+this yet (no past-weeks picker), but the data layer is already there
+for one — see "Known open items" below.
+
+The grid's numbering (which cell gets which clue number, which cells
+start Across/Down words) is **computed at runtime** from `pattern` —
+standard crossword numbering rules, implemented in `computeNumbers()`.
+Never hand-number anything; if `pattern` is right, the numbering is
+automatically right.
+
+### Building a new week's puzzle now
+
+1. Run the skill's extraction workflow (below) as before.
+2. Create `puzzles/YYYY-MM-DD.json` with the new `pattern`/`across`/
+   `down`/header fields and a fresh `id` (e.g.
+   `ccp-YYYY-MM-DD-slug`) and `solutionSalt`.
+3. Prepend a new entry to `puzzles/index.json` (newest first) pointing
+   at that file.
+4. Once a reference solve is ready, use the admin panel
+   (`?admin=1`) to generate that week's `solutionHashesFile` and save
+   it to the path named in the JSON.
+5. `index.html` itself does not need to change for a routine weekly
+   puzzle anymore.
 
 The grid's numbering (which cell gets which clue number, which cells
 start Across/Down words) is **computed at runtime** from `pattern` —
@@ -127,16 +167,18 @@ in `working-files/crossword_0814_full_toolset.html`):
 
 There is no plaintext reference solve anywhere in this repo or shipped page
 (added Aug 2026, after the person explicitly asked that a view-source/bot
-couldn't recover the answer letters). Instead, `solution-hashes.txt` at the
-repo root holds one salted SHA-256 hash per Across/Down entry (`1A-<hash>`,
-`1D-<hash>`, ...). The browser hashes whatever the player typed for each
-entry and compares hashes — this can report *how many answers* don't match,
-never *which letters* are right, and the actual solve can't be recovered
-from the repo even by someone with full read access to it.
+couldn't recover the answer letters). Instead, each week's puzzle JSON
+points (via `solutionHashesFile`) at a file like
+`puzzles/2026-08-14.solution-hashes.txt`, holding one salted SHA-256 hash
+per Across/Down entry (`1A-<hash>`, `1D-<hash>`, ...). The browser hashes
+whatever the player typed for each entry and compares hashes — this can
+report *how many answers* don't match, never *which letters* are right, and
+the actual solve can't be recovered from the repo even by someone with full
+read access to it.
 
-If `solution-hashes.txt` is missing/unfetchable, the completion badge just
-says "Grid complete" (no reference solve available). Once loaded, the badge
-reports either "matches" or "differs ... in N answer(s)".
+If that file is missing/unfetchable, the completion badge just says "Grid
+complete" (no reference solve available). Once loaded, the badge reports
+either "matches" or "differs ... in N answer(s)".
 
 **Security note, stated plainly:** this is still a deterrent, not a vault.
 `SOLUTION_SALT` (in `index.html`) is public by necessity — the client has to
@@ -162,11 +204,11 @@ deviate:**
   favor of a quiet status badge, because repeatedly clearing/refilling
   cells while double-checking kept re-triggering it.
 
-`solution-hashes.txt` still has to be baked/replaced at build/publish
+The solution-hashes file still has to be baked/replaced at build/publish
 time and redeployed — there's no server, so nothing can write to it at
 runtime for real. What *does* exist now (added Aug 2026, after
 explicit discussion) is an admin-only helper that generates a
-paste-ready `solution-hashes.txt` from whatever grid you've solved in
+paste-ready solution-hashes file from whatever grid you've solved in
 the normal UI, so you don't have to hand-hash 78+ answers yourself:
 
 - Load the page with `?admin=1` in the URL — this reveals a
@@ -184,11 +226,11 @@ the normal UI, so you don't have to hand-hash 78+ answers yourself:
   moving off static GitHub Pages onto something with a backend, which
   was explicitly ruled out in favor of staying dependency-free.
 - Once unlocked, solve the puzzle in the actual grid (same UI
-  everyone else uses), then click "Generate solution-hashes.txt from
+  everyone else uses), then click "Generate solution-hashes file from
   my grid" — it reads the live `grid` state, not a separate code/import
   step, so it can't drift out of sync with whatever puzzle is
-  currently loaded. Paste the output over the existing
-  `solution-hashes.txt` and redeploy.
+  currently loaded. Paste the output over the file named in that
+  puzzle's `solutionHashesFile` and redeploy.
 - This intentionally does **not** revive the old base64
   export/import ("progress code") flow from
   `working-files/crossword_0814_full_toolset.html` as the *primary*
@@ -196,7 +238,7 @@ the normal UI, so you don't have to hand-hash 78+ answers yourself:
   decode step. That mechanism is still there in the full-toolset
   build, and was in fact used once already: a saved progress code
   from that build was decoded outside the app to cross-check this
-  week's `solution-hashes.txt` before it shipped.
+  week's solution-hashes file before it shipped.
 
 ## UI/UX details worth preserving (each fixed a reported bug)
 
@@ -293,11 +335,28 @@ catch more, faster, and CSS assertions will actually be trustworthy.
 
 ## Known open items / things not yet done
 
-- Deployed to GitHub Pages at https://sinejoe.github.io/ccpxwd/ as of
-  Aug 2026. Every push to `main` auto-redeploys.
-- No mechanism exists yet for updating `SOLUTION` after initial
-  publish other than manually editing the file and redeploying.
+- Deployed to GitHub Pages at https://sinejoe.github.io/ccpxwd/ (custom
+  domain https://ccpx.fyi) as of Aug 2026. Every push to `main`
+  auto-redeploys.
+- No mechanism exists yet for updating a puzzle's reference solve
+  after initial publish other than using the admin panel and
+  redeploying.
 - The skill's weekly-build workflow has only been exercised for two
   issues (Aug 7 and Aug 14, 2026) — page-number-drift and layout
   changes week to week are anticipated but not yet battle-tested
   beyond that.
+- **Past-weeks menu, not yet built.** `puzzles/index.json` already
+  lists every published week and `index.html?puzzle=<id>` already
+  loads any of them (see "How the puzzle data is structured" above) —
+  the data layer supports a picker, but no UI exposes it yet. Adding
+  one is mostly a small dropdown/list in the hamburger menu that reads
+  `puzzles/index.json` and links to `?puzzle=<id>`.
+- **Weekly Issuu fetch is still a manual/chat-driven workflow**
+  (`skill/references/workflow_notes.md`), not automated in this repo.
+  It relies on `claude-in-chrome` to render Issuu's JS-only reader and
+  read its SVG text layer — none of that runs in a plain script yet.
+  A real automation (e.g. a scheduled GitHub Action) would need its
+  own approach for finding the crossword page and getting clue text
+  without a browser-rendered SVG text layer (OCR, or an Issuu API
+  call, are the two obvious candidates, neither implemented). Discussed
+  Aug 2026; not started.

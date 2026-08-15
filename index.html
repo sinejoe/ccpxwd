@@ -47,17 +47,6 @@
     font-style:italic;
     color:#5a5346;
   }
-  #banner{
-    display:none;
-    background:var(--accent);
-    color:var(--paper);
-    text-align:center;
-    padding:8px;
-    font-size:14px;
-    letter-spacing:1px;
-    margin-bottom:10px;
-    border-radius:2px;
-  }
   .toolbar{
     display:flex;
     flex-wrap:wrap;
@@ -280,6 +269,23 @@
     font-size:12.5px;
   }
   body.focus-mode #toolbar.open{ display:flex; }
+  /* Full-width row under grid+clues in focus mode -- the completion badge
+     moves here (via JS) so it spans the whole app, not just the grid column.
+     sizeFocusMode() measures its rendered height and shrinks #app to match,
+     so it never gets pushed below the fold. */
+  #focusBadgeRow{ display:none; }
+  body.focus-mode #focusBadgeRow{
+    display:flex;
+    justify-content:center;
+    width:100vw;
+    box-sizing:border-box;
+    padding:0 14px 12px;
+  }
+  body.focus-mode #focusBadgeRow .status-badge{
+    max-width:none;
+    width:100%;
+    font-size:12px;
+  }
   @media(max-width:700px){
     body.focus-mode #app{ flex-direction:column; }
     body.focus-mode #leftCol{ height:auto; flex:0 0 auto; }
@@ -347,20 +353,15 @@
     background:var(--hi);
     color:var(--ink);
     align-self:center;
+    margin-top:12px;
+    max-width:320px;
+    text-align:center;
+    line-height:1.5;
   }
   .status-badge.show{ display:inline-block; }
   /* Understated either way -- a mismatch isn't an error state, just a note */
   .status-badge.match{ background:#dce8dc; }
   .status-badge.mismatch{ background:#efe2c8; }
-  #hamburgerBtn.complete::after{
-    content:'';
-    position:absolute;
-    top:2px; right:2px;
-    width:7px; height:7px;
-    border-radius:50%;
-    background:#3f7d4a;
-    border:1px solid var(--paper);
-  }
 </style>
 </head>
 <body>
@@ -371,10 +372,7 @@
   <div class="sub">Jonesin' by Matt Jones &mdash; swapping one for the other.</div>
 </header>
 
-<div id="banner"></div>
-
 <div class="toolbar" id="toolbar">
-  <span id="completionStatus" class="status-badge"></span>
   <button id="focusBtn">Focus mode</button>
   <button id="clearBtn">Clear all</button>
 </div>
@@ -382,6 +380,7 @@
 <div id="app">
   <div id="leftCol">
     <div id="gridWrap"><div id="grid"></div></div>
+    <span id="completionStatus" class="status-badge"></span>
   </div>
   <div id="cluesPanel">
     <button id="hamburgerBtn" aria-label="Tools">&#9776;</button>
@@ -396,7 +395,11 @@
   </div>
 </div>
 
-<footer>Fills in and remembers your progress in this browser. When the grid's fully filled, the status badge above the grid will say whether it matches our reference solve.</footer>
+<!-- Focus mode only: the completion badge moves here (via JS) so it spans
+     the full width under grid+clues instead of just the grid column. -->
+<div id="focusBadgeRow"></div>
+
+<footer>Fills in and remembers your progress in this browser. When the grid's fully filled, the status badge below the grid will say whether it matches our reference solve.</footer>
 
 <!-- Admin-only: generates a pasteable solution-hashes.txt from whatever grid you've
      solved in the normal UI above. Hidden unless the page is loaded with
@@ -746,18 +749,19 @@ let completionStatusToken = 0;
 async function updateCompletionStatus(){
   const full = isGridFull();
   const badge = document.getElementById('completionStatus');
-  hamburgerBtn.classList.toggle('complete', full);
   badge.classList.remove('match','mismatch');
 
   if(!full){
     badge.classList.remove('show');
     badge.textContent = '';
+    sizeFocusMode();
     return;
   }
   badge.classList.add('show');
 
   if(!SOLUTION_HASHES){
     badge.textContent = 'Grid complete';
+    sizeFocusMode();
     return;
   }
   // Comparing against a submitted reference solve, not an official answer
@@ -785,6 +789,7 @@ async function updateCompletionStatus(){
     badge.textContent = `Complete — our solve is a little different, in ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
     badge.classList.add('mismatch');
   }
+  sizeFocusMode();
 }
 
 function handleKey(e,r,c){
@@ -960,31 +965,29 @@ function renderClues(){
   });
 }
 
-function showBanner(msg,ms=2200){
-  const b = document.getElementById('banner');
-  b.textContent = msg;
-  b.style.display='block';
-  clearTimeout(showBanner._t);
-  showBanner._t = setTimeout(()=>{ b.style.display='none'; }, ms);
-}
-
 // ---- Focus mode: hides header/toolbar, grid fills the viewport height,
 // clue panel fills the remaining width. Toolbar becomes a hamburger dropdown. ----
 const hamburgerBtn = document.getElementById('hamburgerBtn');
 const toolbarEl = document.getElementById('toolbar');
 const appEl = document.getElementById('app');
+const focusBadgeRowEl = document.getElementById('focusBadgeRow');
+const leftColEl = document.getElementById('leftCol');
+const completionStatusEl = document.getElementById('completionStatus');
 
 // CSS 100vh/100dvh assumes #app starts at the very top of the viewport, which
 // isn't necessarily true here -- if this is embedded in something with its own
 // chrome above it (e.g. an artifact viewer's header bar), #app actually starts
 // lower than that, and 100vh overshoots the real available space by exactly
-// however tall that chrome is. Measuring #app's actual on-screen position and
-// sizing off THAT is correct regardless of what (if anything) sits above it.
+// however tall that chrome is. Measuring #app's actual on-screen position (and
+// #focusBadgeRow's actual rendered height, so #app doesn't overlap the badge
+// once it appears) and sizing off THAT is correct regardless of what (if
+// anything) sits above/below it.
 function sizeFocusMode(){
   if(!document.body.classList.contains('focus-mode')) return;
   const top = appEl.getBoundingClientRect().top;
+  const barHeight = focusBadgeRowEl.offsetHeight;
   const bottomMargin = 12;
-  const available = window.innerHeight - top - bottomMargin;
+  const available = window.innerHeight - top - barHeight - bottomMargin;
   appEl.style.height = Math.max(200, available) + 'px';
 }
 window.addEventListener('resize', sizeFocusMode);
@@ -1006,6 +1009,7 @@ window.addEventListener('resize', positionToolbarDropdown);
 document.getElementById('focusBtn').addEventListener('click', (e)=>{
   document.body.classList.add('focus-mode');
   toolbarEl.classList.remove('open');
+  focusBadgeRowEl.appendChild(completionStatusEl);
   const raf = window.requestAnimationFrame || (fn => setTimeout(fn, 16));
   raf(()=>{ sizeFocusMode(); positionToolbarDropdown(); });
 });
@@ -1030,11 +1034,19 @@ exitFocusBtn.addEventListener('click', ()=>{
   document.body.classList.remove('focus-mode');
   toolbarEl.classList.remove('open');
   appEl.style.height = ''; // hand sizing back to normal-mode CSS
+  leftColEl.appendChild(completionStatusEl);
 });
 toolbarEl.appendChild(exitFocusBtn);
 toolbarEl.addEventListener('click', (e)=>{
   if(document.body.classList.contains('focus-mode') && e.target.tagName==='BUTTON'){
     toolbarEl.classList.remove('open');
+  }
+});
+// Esc exits focus mode -- standard convention for a fullscreen-ish view, and
+// works even mid-typing since it fires on the grid's own inputs too.
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && document.body.classList.contains('focus-mode')){
+    exitFocusBtn.click();
   }
 });
 
@@ -1148,7 +1160,6 @@ let restoredLetters = Array.from({length:SIZE},()=>Array(SIZE).fill(''));
     for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
       if(restoredLetters[r][c]) grid[r][c].letter = restoredLetters[r][c];
     }
-    showBanner('Restored your progress from last time.');
   }
   render();
   updateCompletionStatus();

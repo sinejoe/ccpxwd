@@ -62,7 +62,7 @@ shape directly):
 {
   "id": "<date as YYYYMMDD, e.g. 2026-08-14 -> 20260814>",
   "date": "<date>",
-  "kicker": "Charleston City Paper Crossword - <Mon DD YYYY, e.g. Aug 14 2026>",
+  "kickerDate": "<Mon DD YYYY, e.g. Aug 14 2026>",
   "title": "<puzzleTitle from meta.json>",
   "subtitle": "<byline from meta.json>",
   "solutionSalt": "ccpxwd-<year>-ref-solve",

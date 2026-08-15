@@ -37,6 +37,9 @@
     text-transform:uppercase;
     color:#594923;
   }
+  header .kicker .kicker-date{
+    margin-top:4px;
+  }
   header h1{
     margin:4px 0 2px;
     font-size:26px;
@@ -367,7 +370,10 @@
 <body>
 
 <header>
-  <div class="kicker" id="kicker"></div>
+  <div class="kicker" id="kicker">
+    <div class="kicker-title">Charleston City Paper Crossword</div>
+    <div class="kicker-date" id="kickerDate"></div>
+  </div>
   <h1 id="puzzleTitle"></h1>
   <div class="sub" id="puzzleSub"></div>
 </header>
@@ -475,7 +481,7 @@ async function loadPuzzleData(){
   PUZZLE_ID = data.id;
 
   document.title = data.title + ' \u2014 Charleston City Paper Crossword';
-  document.getElementById('kicker').textContent = data.kicker;
+  document.getElementById('kickerDate').textContent = data.kickerDate;
   document.getElementById('puzzleTitle').textContent = data.title;
   document.getElementById('puzzleSub').textContent = data.subtitle;
 }

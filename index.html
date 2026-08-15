@@ -139,6 +139,12 @@
     caret-color:transparent;
   }
   .cell.white input:focus{ outline:none; }
+  /* The JS selects the existing letter on focus so the next keystroke
+     replaces it instead of inserting beside it (see focusInput) -- but the
+     browser's default blue/gray selection paint over a single centered
+     letter just reads as visual noise, not a real "selection" affordance,
+     so paint it as plain background instead of highlighting it. */
+  .cell.white input::selection{ background:transparent; color:var(--ink); }
   .cell .num{
     position:absolute;
     top:0px; left:1px;
@@ -790,6 +796,12 @@ function handleKey(e,r,c){
         grid[prev.r][prev.c].letter='';
         selectCell(prev.r,prev.c);
         focusInput(prev.r,prev.c);
+        // grid state is now cleared, but the input's own DOM value still
+        // holds whatever was last typed there -- selectCell/focusInput only
+        // move focus, they don't touch .value, so without this the cell
+        // looks like backspace did nothing even though it's logically empty.
+        const prevEl = document.querySelector(`.cell[data-r="${prev.r}"][data-c="${prev.c}"] input`);
+        if(prevEl) prevEl.value = '';
       }
     }
     queueSave();
@@ -799,6 +811,16 @@ function handleKey(e,r,c){
   else if(key==='ArrowDown'){ arrowMove(r,c,'D',1); e.preventDefault(); }
   else if(key==='ArrowUp'){ arrowMove(r,c,'D',-1); e.preventDefault(); }
   else if(key===' '){ cur.dir = cur.dir==='A'?'D':'A'; highlight(); e.preventDefault(); }
+  else if(key==='Tab'){
+    // Jump to the next/previous clue (same direction), not the next cell --
+    // the browser's default Tab just follows DOM order, i.e. one cell over.
+    e.preventDefault();
+    const w = wordAt(r,c,cur.dir);
+    if(w){
+      const target = adjacentWordFirstCell(w.num, cur.dir, e.shiftKey ? -1 : 1);
+      if(target) selectCell(target.r, target.c);
+    }
+  }
 }
 
 // NYT-style arrow behavior:
@@ -873,14 +895,35 @@ function nextTypingCell(r,c,dir){
   return nextWordFirstCell(w.num, dir);
 }
 
-function nextWordFirstCell(num, dir){
+// Cells of a word in reading order, e.g. for firstEmptyCellInWord below.
+function wordCells(w, dir){
+  const cells = [];
+  for(let i=0;i<w.len;i++){
+    cells.push(dir==='A' ? {r:w.r,c:w.c+i} : {r:w.r+i,c:w.c});
+  }
+  return cells;
+}
+
+// NYT-style: landing on a word that already has some letters filled in
+// (e.g. from crossing entries) jumps to its first empty cell, not always
+// the very first cell of the word.
+function firstEmptyCellInWord(w, dir){
+  const cells = wordCells(w, dir);
+  return cells.find(p=>!grid[p.r][p.c].letter) || cells[0];
+}
+
+function adjacentWordFirstCell(num, dir, step){
   const starts = dir==='A' ? acrossStart : downStart;
   const list = Object.keys(starts).map(Number).sort((a,b)=>a-b);
   const idx = list.indexOf(num);
   if(idx===-1) return null;
-  const nextNum = list[(idx+1) % list.length];
+  const nextNum = list[(idx+step+list.length) % list.length];
   const w = starts[nextNum];
-  return {r:w.r, c:w.c};
+  return firstEmptyCellInWord(w, dir);
+}
+
+function nextWordFirstCell(num, dir){
+  return adjacentWordFirstCell(num, dir, 1);
 }
 
 function highlight(){

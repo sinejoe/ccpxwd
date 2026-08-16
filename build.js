@@ -10,7 +10,7 @@ const ROOT = __dirname;
 const DIST = path.join(ROOT, 'dist');
 
 const HTML_FILES = ['index.html', 'archive.html', '404.html'];
-const COPY_PATHS = ['puzzles', 'CNAME'];
+const COPY_PATHS = ['puzzles', 'CNAME', '_redirects'];
 
 const MINIFY_OPTS = {
   collapseWhitespace: true,

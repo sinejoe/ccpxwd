@@ -39,23 +39,6 @@
     font-size:26px;
     letter-spacing:1px;
   }
-  .toolbar{
-    display:flex;
-    justify-content:center;
-    margin-bottom:20px;
-  }
-  .toolbar a{
-    font-family:'Courier New', monospace;
-    font-size:11.5px;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
-    background:var(--cell);
-    border:1px solid var(--ink);
-    color:var(--ink);
-    padding:7px 12px;
-    text-decoration:none;
-    border-radius:2px;
-  }
   #list{
     max-width:520px;
     margin:0 auto;
@@ -71,7 +54,19 @@
     text-decoration:none;
   }
   #list a:hover{ background:var(--cell); }
+  #list .title-row{ display:flex; align-items:baseline; gap:8px; }
   #list .title{ font-size:15px; }
+  #list .current-tag{
+    font-family:'Courier New', monospace;
+    font-size:9.5px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--accent);
+    color:var(--paper);
+    padding:2px 6px;
+    border-radius:2px;
+    white-space:nowrap;
+  }
   #list .date{
     font-family:'Courier New', monospace;
     font-size:11.5px;
@@ -89,8 +84,6 @@
   <h1>Archive</h1>
 </header>
 
-<div class="toolbar"><a href="/">This week's puzzle</a></div>
-
 <div id="list"></div>
 <p id="empty" style="display:none;">No past puzzles yet.</p>
 
@@ -103,19 +96,32 @@
     document.getElementById('empty').style.display = 'block';
     return;
   }
-  for(const entry of index){
+  // index[0] is the current week (index.json is newest-first) -- it links
+  // to "/" rather than "/archive/<id>" since that's the live/active puzzle,
+  // not yet an archived one. It naturally moves off this slot and gets a
+  // normal /archive/<id> link once a new week's entry is published above it.
+  index.forEach((entry, i) => {
     const a = document.createElement('a');
-    a.href = '/archive/' + entry.id;
+    a.href = (i === 0) ? '/' : ('/archive/' + entry.id);
+    const titleRow = document.createElement('span');
+    titleRow.className = 'title-row';
     const title = document.createElement('span');
     title.className = 'title';
     title.textContent = entry.title;
+    titleRow.appendChild(title);
+    if(i === 0){
+      const tag = document.createElement('span');
+      tag.className = 'current-tag';
+      tag.textContent = 'Current Puzzle';
+      titleRow.appendChild(tag);
+    }
     const date = document.createElement('span');
     date.className = 'date';
     date.textContent = entry.date;
-    a.appendChild(title);
+    a.appendChild(titleRow);
     a.appendChild(date);
     listEl.appendChild(a);
-  }
+  });
 })();
 </script>
 

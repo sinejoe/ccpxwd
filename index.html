@@ -399,13 +399,13 @@
 <div class="toolbar" id="toolbar">
   <button id="focusBtn">Focus mode</button>
   <button id="clearBtn">Clear all</button>
-  <a id="archiveBtn" href="/archive.html">Archive</a>
+  <a id="archiveBtn" href="/archive">Archive</a>
 </div>
 
 <div id="app">
   <div id="leftCol">
     <div id="gridWrap"><div id="grid"></div></div>
-    <span id="completionStatus" class="status-badge"><span id="completionStatusText"></span><a id="completionSourceLink" href="#" target="_blank" rel="noopener" style="display:none; margin-left:8px; color:inherit;">(source)</a></span>
+    <span id="completionStatus" class="status-badge"><span id="completionStatusText"></span><a id="completionSourceLink" href="#" target="_blank" rel="noopener" style="display:none; margin-top:4px; color:inherit;">(source)</a></span>
   </div>
   <div id="cluesPanel">
     <button id="hamburgerBtn" aria-label="Tools">&#9776;</button>
@@ -770,13 +770,13 @@ async function updateCompletionStatus(){
     badge.classList.add('match');
   } else {
     badgeText.textContent = isOfficial
-      ? `Complete — differs from the official answer key in ${mismatches} answer${mismatches===1?'':'s'}.`
-      : `Complete — our solve is a little different, in ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
+      ? `Complete — differs from the official answer key, affecting ${mismatches} answer${mismatches===1?'':'s'}.`
+      : `Complete — our solve is a little different, affecting ${mismatches} answer${mismatches===1?'':'s'} (we're not the official puzzle master — check next week's paper for official answers!)`;
     badge.classList.add('mismatch');
   }
   if(isOfficial && SOLUTION_SOURCE_URL){
     sourceLink.href = SOLUTION_SOURCE_URL;
-    sourceLink.style.display = '';
+    sourceLink.style.display = 'block';
   }
   sizeFocusMode();
 }

@@ -426,36 +426,6 @@
 
 <footer>Remembers your progress in this browser. When the grid's fully filled, we'll tell you if your solve matches <span id="footerSolveNote">our reference solve</span>.</footer>
 
-<!-- Admin-only: generates a pasteable solution-hashes.txt from whatever grid you've
-     solved in the normal UI above. Hidden unless the page is loaded with
-     ?admin=1, and passphrase-gated even then -- this is a deterrent against
-     casual snooping, not real security (the hash below is visible in page
-     source and could be brute-forced offline by a determined attacker), which
-     is an accepted tradeoff since this only guards "who can suggest a
-     reference solve", not any sensitive data. -->
-<div id="adminPanel" style="display:none; max-width:640px; margin:24px auto; padding:16px; border:2px dashed var(--ink); font-size:14px;">
-  <div id="adminGate">
-    <strong>Admin: set reference solve</strong>
-    <div style="margin-top:8px;">
-      <input type="password" id="adminPass" placeholder="passphrase" autocomplete="off" style="padding:6px;">
-      <button id="adminUnlock" type="button">Unlock</button>
-      <span id="adminGateMsg" style="color:var(--accent); margin-left:8px;"></span>
-    </div>
-  </div>
-  <div id="adminTools" style="display:none;">
-    <p>Solve the puzzle above in the normal grid, then click below to generate
-       this week's solution-hashes file -- one salted hash per Across/Down
-       answer, no actual letters. Paste the result over the file named in
-       this puzzle's <code>puzzles/*.json</code> entry
-       (<code>solutionHashesFile</code>) and redeploy.</p>
-    <button id="adminGenerate" type="button">Generate solution-hashes file from my grid</button>
-    <span id="adminGenMsg" style="margin-left:8px;"></span>
-    <textarea id="adminOutput" readonly rows="17" style="display:none; width:100%; margin-top:10px; font-family:monospace; font-size:12px;"></textarea>
-    <button id="adminCopy" type="button" style="display:none; margin-top:6px;">Copy to clipboard</button>
-  </div>
-</div>
-
-
 <script>
 const SIZE = 15;
 
@@ -530,8 +500,7 @@ async function loadPuzzleData(){
 // deterrent, not a vault: SOLUTION_SALT is public (has to be, the client
 // needs it too), and a scripted client could in principle narrow individual
 // answers down faster than guessing blind by watching how the mismatch count
-// changes as it tries words -- same accepted tradeoff as the admin
-// passphrase gate elsewhere in this file.
+// changes as it tries words.
 let SOLUTION_HASHES = null; // null = no reference solve available/loaded
 async function loadSolutionHashes(){
   try{
@@ -1197,49 +1166,10 @@ let restoredLetters = Array.from({length:SIZE},()=>Array(SIZE).fill(''));
 
 // grid initialization + first render happens in boot() above, after checking for saved progress
 
-// --- Admin: generate this week's solution-hashes file from the currently-solved grid ---
-// See the HTML comment above #adminPanel for the threat-model tradeoff here.
-const ADMIN_HASH = '04a2d53d956589e857c4fe335f5a5518c7e393621c79d9c2189ddeb60464417c';
 async function sha256hex(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
-if(new URLSearchParams(location.search).get('admin')==='1'){
-  document.getElementById('adminPanel').style.display='block';
-}
-document.getElementById('adminUnlock').addEventListener('click', async ()=>{
-  const entered = document.getElementById('adminPass').value;
-  const msg = document.getElementById('adminGateMsg');
-  if(await sha256hex(entered) === ADMIN_HASH){
-    document.getElementById('adminGate').style.display='none';
-    document.getElementById('adminTools').style.display='block';
-  } else {
-    msg.textContent = 'Wrong passphrase.';
-  }
-});
-document.getElementById('adminGenerate').addEventListener('click', async ()=>{
-  const genMsg = document.getElementById('adminGenMsg');
-  if(!isGridFull()){
-    genMsg.textContent = 'Fill in the whole grid first.';
-    return;
-  }
-  genMsg.textContent = 'Hashing...';
-  const lines = [];
-  for(const [num,start] of Object.entries(acrossStart)){
-    lines.push(num+'A-'+await sha256hex(SOLUTION_SALT + wordText(start,'A')));
-  }
-  for(const [num,start] of Object.entries(downStart)){
-    lines.push(num+'D-'+await sha256hex(SOLUTION_SALT + wordText(start,'D')));
-  }
-  genMsg.textContent = '';
-  const out = document.getElementById('adminOutput');
-  out.value = lines.join('\n') + '\n';
-  out.style.display = 'block';
-  document.getElementById('adminCopy').style.display = 'inline-block';
-});
-document.getElementById('adminCopy').addEventListener('click', ()=>{
-  navigator.clipboard.writeText(document.getElementById('adminOutput').value);
-});
 </script>
 </body>
 </html>

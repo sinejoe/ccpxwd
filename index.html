@@ -441,16 +441,7 @@ const SIZE = 15;
 let pattern, ACROSS, DOWN, SOLUTION_SALT, SOLUTION_HASHES_FILE, PUZZLE_ID, SOLUTION_SOURCE, SOLUTION_SOURCE_URL;
 
 async function loadPuzzleData(){
-  // GitHub Pages has no server-side routing: a direct hit on /archive/<id>
-  // 404s, since no such file exists. 404.html bounces here with the
-  // original path+query preserved in ?redirect=... -- restore that as the
-  // visible URL via replaceState so the address bar shows /archive/<id>
-  // instead of the redirect bounce, then read the puzzle id out of it.
-  const bounced = new URLSearchParams(location.search).get('redirect');
-  const effectivePath = bounced || (location.pathname + location.search);
-  if(bounced) history.replaceState(null, '', bounced);
-
-  const [pathname, search] = effectivePath.split('?');
+  const [pathname, search] = (location.pathname + location.search).split('?');
   const archiveMatch = pathname.match(/\/archive\/([^/?#]+)/);
   const requestedId = (archiveMatch && decodeURIComponent(archiveMatch[1]))
     || new URLSearchParams(search || '').get('puzzle');

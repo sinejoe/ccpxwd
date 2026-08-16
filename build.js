@@ -1,7 +1,7 @@
 // Deploy build step: minifies the served HTML/CSS/inline-JS and copies
-// everything else (puzzle data, CNAME) through untouched. Source files stay
-// fully commented in git -- only dist/, which GitHub Actions publishes to
-// Pages, is stripped. Run via `npm run build`.
+// everything else (puzzle data, _redirects) through untouched. Source files
+// stay fully commented in git -- only dist/, which Cloudflare Pages builds
+// and serves, is stripped. Run via `npm run build`.
 const fs = require('fs');
 const path = require('path');
 const { minify } = require('html-minifier-terser');
@@ -10,7 +10,7 @@ const ROOT = __dirname;
 const DIST = path.join(ROOT, 'dist');
 
 const HTML_FILES = ['index.html', 'archive.html', '404.html'];
-const COPY_PATHS = ['puzzles', 'CNAME', '_redirects'];
+const COPY_PATHS = ['puzzles', '_redirects'];
 
 const MINIFY_OPTS = {
   collapseWhitespace: true,

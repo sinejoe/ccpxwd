@@ -7,10 +7,9 @@ Matt Jones).
 ## Play it
 
 Live at https://ccpx.fyi. Locally, serve the directory (e.g.
-`python3 -m http.server 8842`, or `docker compose up -d` for the
-Jekyll build) rather than opening `index.html` via `file://` — it
-fetches puzzle data with `fetch()`, which most browsers block on
-`file://` URLs.
+`python3 -m http.server 8842`) rather than opening `index.html` via
+`file://` — it fetches puzzle data with `fetch()`, which most
+browsers block on `file://` URLs.
 
 Progress autosaves to `localStorage`; a status badge shows whether a
 finished grid matches the reference solve, when one has been set for
@@ -33,16 +32,17 @@ that week's puzzle.
   puzzle: `skill/fetch-issue/` finds the current issue on Issuu and
   saves the raw page image/text layer; `skill/build-puzzle-json/`
   parses that into a new `puzzles/<date>.json` entry.
-- `404.html` — GitHub Pages has no server-side routing, so a direct
-  hit on a pretty URL like `/archive/20260814` 404s. This bounces to
-  `/` with the original path preserved in `?redirect=`; `index.html`
-  restores it via `history.replaceState` and routes to that puzzle.
-  `?puzzle=<id>` still works too as a plain query-string alternative.
-- `_config.yml` — Jekyll config for GitHub Pages; excludes non-app
-  files (docs, `skill/`, working files) from the published site.
-- `docker-compose.yml` — local Jekyll container for testing the
-  GitHub Pages build (including the `_config.yml` exclude list)
-  before pushing.
+- `_redirects` — Cloudflare Pages rewrite rule: `/archive/<id>` serves
+  `index.html` directly (200, no real redirect) so the pretty archive
+  URLs work without a matching file on disk. `index.html` reads the
+  puzzle id straight out of `location.pathname`. `?puzzle=<id>` still
+  works too as a plain query-string alternative.
+- `404.html` — plain not-found page for genuinely missing URLs.
+- `build.js` / `package.json` — `npm run build` minifies
+  `index.html`/`archive.html`/`404.html` into `dist/` (comments
+  stripped, inline JS/CSS minified) and copies `puzzles/` and
+  `_redirects` through untouched. Cloudflare Pages runs this on every
+  push to `main` and serves `dist/`.
 
 ## Status
 

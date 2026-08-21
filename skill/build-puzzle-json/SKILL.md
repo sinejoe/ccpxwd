@@ -84,23 +84,14 @@ Use real unicode punctuation (curly quotes, em dash) in the JSON
 strings, not HTML entities — `index.html` writes these fields via
 `textContent`, not `innerHTML`.
 
-`solutionHashesFile` does not need to exist yet — the completion badge
-just shows "Grid complete" with no match/mismatch comparison until
-someone solves the puzzle via the site's `?admin=1` panel and generates
-that file. That's a separate, later step, not part of this skill.
-
-**Upgrading a puzzle to `solutionSource: "official"`** (once a later
-issue has printed that puzzle's answer key — see
-`working-files/<date>/printed_solution_grid_CANDIDATE.jpg` and that
-week's `meta.json` `officialSolutionUrl`/`officialSolutionPage`,
-produced by `fetch_issue.py` when it processes the *following* week):
-solve this puzzle's grid in `?admin=1` by reading off the printed crop
-image (not by playing it), generate the hashes file as usual, then set
-`"solutionSource": "official"` and `"officialSolutionUrl"` (from that
-meta.json) on this puzzle's already-published JSON. Same hash-compare
-mechanism as a reference solve — only the completion-badge wording
-changes. Confirm the crop's bounds visually first; it's an unverified
-heuristic per `../references/workflow_notes.md`.
+`solutionHashesFile` does not need to exist yet for *this* week's new
+puzzle — the completion badge just shows "Grid complete" with no
+match/mismatch comparison until either a later week's run bakes in the
+official solve (Step 7), or a reference solve is captured now by
+having someone solve it live in a Playwright browser window and
+handing the finished grid back (see `../SKILL.md` "Reference solve for
+the current week"). There is no on-site admin panel for this — that
+was deliberately removed and stays removed.
 
 ## Step 5 — Add it to puzzles/index.json
 
@@ -125,4 +116,48 @@ a real browser (Playwright, or just open it) that:
 - The header (kicker/title/subtitle) and `<title>` show this week's
   puzzle, not a stale one.
 
-Only report success once these checks pass.
+Only move on to Step 7 once these checks pass.
+
+## Step 7 — Bake in last week's official solve
+
+Standard part of every weekly run, not optional busywork — do this
+before reporting the whole pipeline done. `fetch_issue.py` (in
+`fetch-issue/SKILL.md` Step 1) already cropped last (the prior) week's
+printed solution grid to
+`working-files/<the-prior-week's-date>/printed_solution_grid_CANDIDATE.jpg`
+and merged `officialSolutionUrl`/`officialSolutionPage` into that
+prior week's `meta.json`. Use it to upgrade that already-published
+`puzzles/<prior-date>.json`:
+
+1. Confirm the crop's bounds visually — re-crop tighter (see
+   `extract_grid.py`-style cropping, or plain PIL) if other page
+   content bled in, and upscale if letters aren't legible.
+2. Transcribe the solved grid's letters. Use the prior week's
+   already-published `pattern` field as ground truth for black-cell
+   positions rather than re-reading them from the image — only the
+   letters in white cells need transcribing, which also gives you a
+   free cross-check (spot-verify a few words against that puzzle's own
+   clue list, e.g. a themed answer you can recognize).
+3. Compute `sha256hex(solutionSalt + word)` for every Across/Down word
+   (same per-cell numbering algorithm `index.html`'s `computeNumbers()`
+   uses: scan row-major, a cell starts a number if it starts an Across
+   and/or Down entry) and write `<num><A/D>-<hash>` lines, one per
+   entry, to that puzzle's `solutionHashesFile` path. Assert the
+   resulting Across/Down number sets exactly match that JSON's existing
+   `across`/`down` clue-number lists before trusting the output — a
+   mismatch means a transcription error, not a grid-structure error
+   (the pattern was already known-good).
+4. Set `"solutionSource": "official"` and `"officialSolutionUrl"` (from
+   that prior week's `meta.json`) on `puzzles/<prior-date>.json`.
+5. Verify in a real browser: load `?puzzle=<prior-id>`, fill the grid
+   via `input.dispatchEvent(new Event('input',{bubbles:true}))` with
+   the transcribed letters, and confirm the completion badge reads the
+   "match ... official answer key from a later issue" wording.
+
+Skip only if the crop is unusable or the prior week has no published
+puzzle (e.g. a gap week) — note why in your final report if so, since
+the default expectation is that this step runs every time.
+
+Framing rules for the match/mismatch UI are in the repo's `CLAUDE.md`:
+never call anything "wrong", never flag individual cells, always make
+clear this is the official key, not live cell-by-cell grading.

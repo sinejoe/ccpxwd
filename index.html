@@ -4,9 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="An unofficial, fan-made convenience player for solving the Charleston City Paper's weekly crossword online. Not affiliated with the Charleston City Paper; no copyright is claimed over the puzzle content.">
-<title>Charleston City Paper Crossword</title>
+<title>__OG_TITLE__</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/favicon.ico">
+<!-- __OG_TITLE__/__OG_URL__/__OG_IMAGE__ are placeholder tokens filled in per-puzzle
+     by build.js (see buildPuzzleVariants()) -- link-preview crawlers (iMessage, Slack,
+     etc.) read these from the static HTML without running JS, so each puzzle/archive
+     entry needs its own baked-in copy rather than relying on the client-side title swap
+     in loadPuzzleData(). This source file keeps the literal placeholder tokens; only the
+     built dist/ variants get real values. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Charleston City Paper Crossword">
+<meta property="og:title" content="__OG_TITLE__">
+<meta property="og:description" content="An unofficial, fan-made convenience player for solving the Charleston City Paper's weekly crossword online.">
+<meta property="og:image" content="__OG_IMAGE__">
+<meta property="og:url" content="__OG_URL__">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="__OG_TITLE__">
+<meta name="twitter:image" content="__OG_IMAGE__">
 <style>
   :root{
     --paper:#f6f1e6;

@@ -58,7 +58,7 @@ async function buildPuzzleVariants(){
 
     await renderGridPng(puzzle.pattern, path.join(DIST, 'og', `${entry.id}.png`));
 
-    const ogTitle = `${puzzle.title} — Charleston City Paper Crossword`;
+    const ogTitle = `${puzzle.title} — ${puzzle.kickerDate} — Charleston City Paper Crossword`;
     const ogImage = `${SITE_URL}/og/${entry.id}.png`;
     const isCurrent = i === 0;
     const ogUrl = isCurrent ? `${SITE_URL}/` : `${SITE_URL}/archive/${entry.id}`;
